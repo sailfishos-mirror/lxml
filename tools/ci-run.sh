@@ -74,7 +74,7 @@ if [ -z "${PYTHON_VERSION##2*}" ] || [ -z "${PYTHON_VERSION##pypy-2*}" ];
   else python -m pip install -U pip setuptools wheel;
 fi
 if [ -z "${PYTHON_VERSION##*-dev}" ];
-  then CYTHON_COMPILE_MINIMAL=true  python -m pip install https://github.com/cython/cython/archive/master.zip;
+  then CYTHON_COMPILE=false  python -m pip install https://github.com/cython/cython/archive/master.zip;
   else python -m pip install -r requirements.txt;
 fi
 if [ -z "${PYTHON_VERSION##2*}" ] || [ -z "${PYTHON_VERSION##pypy-2*}" ]; then
