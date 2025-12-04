@@ -1983,7 +1983,9 @@ cdef xmlDoc* _newHTMLDoc() except NULL:
     __GLOBAL_PARSER_CONTEXT.initDocDict(result)
     return result
 
+
 cdef xmlDoc* _copyDoc(xmlDoc* c_doc, int recursive) except NULL:
+    """Return a copy of c_doc, without moving the names into the dict."""
     cdef xmlDoc* result
     if recursive:
         with nogil:
@@ -1997,7 +1999,7 @@ cdef xmlDoc* _copyDoc(xmlDoc* c_doc, int recursive) except NULL:
 
 
 cdef xmlDoc* _copyDocRoot(xmlDoc* c_doc, xmlNode* c_new_root) except NULL:
-    "Recursively copy the document and make c_new_root the new root node."
+    """Recursively copy the document and make c_new_root the new root node."""
     cdef xmlDoc* result
     cdef xmlNode* c_node
     result = tree.xmlCopyDoc(c_doc, 0) # non recursive
@@ -2010,12 +2012,13 @@ cdef xmlDoc* _copyDocRoot(xmlDoc* c_doc, xmlNode* c_new_root) except NULL:
         raise MemoryError()
 
     tree.xmlDocSetRootElement(result, c_node)
+    # Copy the tail text after setting the root element since libxml2 otherwise unlinks the tail.
     _copyTail(c_new_root.next, c_node)
     return result
 
 
 cdef xmlNode* _copyNodeToDoc(xmlNode* c_node, xmlDoc* c_doc) except NULL:
-    "Recursively copy the element into the document. c_doc is not modified."
+    """Recursively copy the element into the document. c_doc is not modified."""
     cdef xmlNode* c_root
     c_root = tree.xmlDocCopyNode(c_node, c_doc, 1) # recursive
     if c_root is NULL:
