@@ -189,6 +189,11 @@ def setup_extra_options():
             assert package not in package_dir
             package_dir[package] = root_path
 
+    if setupinfo.OPTION_LIMITED_API:
+        setup_options = extra_opts.setdefault('options', {})
+        bdist_wheel_options = setup_options.setdefault('bdist_wheel', {})
+        bdist_wheel_options['py_limited_api'] = f'cp{setupinfo.OPTION_LIMITED_API.replace(".", "")}'
+
     return extra_opts
 
 setup(
