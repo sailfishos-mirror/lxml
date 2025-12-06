@@ -9,27 +9,12 @@ enable = ["pypy", "cpython-prerelease"]
        # "cpython-prerelease"
        # "cpython-freethreading"
 skip = [
-    "cp36-*",
-    "pp36-",
-    "cp37-*",
-    "pp37-*",
     "cp38-*",
     "pp38-*",
     "pp*-manylinux_i686",
     "*-musllinux_i686",
     # Reduce job load and HTTP hit rate on library servers.
     "cp39-*_s390x",
-    # abi3 wheels start at Py3.12.
-    "cp39-*_ppc64le",
-    "cp310-*_ppc64le",
-    "cp311-*_ppc64le",
-    "cp31?t-*_ppc64le",
-    "cp39-*_armv7l",
-    "cp310-*_armv7l",
-    "cp31?t-*_armv7l",
-    "cp39-*_riscv64",
-    "cp310-*_riscv64",
-    "cp31?t-*_riscv64",
 ]
 #test-command = "python {package}/test.py -vv"
 #test-command = "python -c 'import lxml.etree, lxml.objectify, lxml.html'"
@@ -65,7 +50,7 @@ inherit.environment = "append"
 environment.CFLAGS = "-O3 -g1 -pipe -fPIC -flto -march=armv8-a -mtune=cortex-a72"
 
 [[tool.cibuildwheel.overrides]]
-select = "*linux_armv7l *linux_ppc64le *linux_riscv64"
+select = "*i686 *musllinux* *win32 *win_arm64 *macosx_x86_64 *linux_armv7l *linux_ppc64le *linux_riscv64"
 inherit.environment = "append"
 environment.LXML_LIMITED_API = "true"
 inherit.test-requires = "append"
@@ -75,7 +60,7 @@ inherit.test-command = "append"
 test-command = ["abi3audit --verbose {wheel}"]  # cannot use "--strict" due to "Py_REFCNT()" usage
 
 [tool.cibuildwheel.windows]
-archs = ["AMD64", "x86"]
+archs = ["AMD64", "x86", "ARM64"]
 
 [tool.cibuildwheel.macos]
 # https://cibuildwheel.readthedocs.io/en/stable/faq/#what-to-provide suggests to provide
