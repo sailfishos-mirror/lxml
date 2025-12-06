@@ -23,10 +23,13 @@ skip = [
     "cp39-*_ppc64le",
     "cp310-*_ppc64le",
     "cp311-*_ppc64le",
+    "cp31?t-*_ppc64le",
     "cp39-*_armv7l",
     "cp310-*_armv7l",
+    "cp31?t-*_armv7l",
     "cp39-*_riscv64",
     "cp310-*_riscv64",
+    "cp31?t-*_riscv64",
 ]
 #test-command = "python {package}/test.py -vv"
 #test-command = "python -c 'import lxml.etree, lxml.objectify, lxml.html'"
