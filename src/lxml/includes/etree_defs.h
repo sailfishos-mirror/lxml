@@ -5,8 +5,8 @@
 #include "Python.h"
 #ifndef PY_VERSION_HEX
 #  error the development package of Python (header files etc.) is not installed correctly
-#elif defined(Py_LIMITED_API) && Py_LIMITED_API < 0x030c0000
-#  error building this version of lxml in the Limited API requires Python 3.12 or later
+#elif defined(Py_LIMITED_API) && Py_LIMITED_API < 0x030b0000
+#  error building this version of lxml in the Limited API requires Python 3.11 or later
 #elif PY_VERSION_HEX < 0x03090000
 #  error this version of lxml requires Python 3.9 or later
 #endif

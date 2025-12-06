@@ -558,8 +558,8 @@ if OPTION_WITHOUT_CYTHON:
 OPTION_STATIC = staticbuild or has_option('static')
 OPTION_LIMITED_API = option_value('lxml-limited-api')
 if OPTION_LIMITED_API == 'true':
-    #OPTION_LIMITED_API = '3.9' if sys.version_info < (3,12) else '3.12'
-    OPTION_LIMITED_API = '3.12'  # default Limited API target version
+    # default Limited API target version
+    OPTION_LIMITED_API = '3.11' if sys.version_info < (3,12) else '3.12'
 OPTION_DEBUG_GCC = has_option('debug-gcc')
 OPTION_SHOW_WARNINGS = has_option('warnings')
 OPTION_AUTO_RPATH = has_option('auto-rpath')

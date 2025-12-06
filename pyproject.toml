@@ -25,10 +25,8 @@ skip = [
     "cp311-*_ppc64le",
     "cp39-*_armv7l",
     "cp310-*_armv7l",
-    "cp311-*_armv7l",
     "cp39-*_riscv64",
     "cp310-*_riscv64",
-    "cp311-*_riscv64",
 ]
 #test-command = "python {package}/test.py -vv"
 #test-command = "python -c 'import lxml.etree, lxml.objectify, lxml.html'"
@@ -66,7 +64,7 @@ environment.CFLAGS = "-O3 -g1 -pipe -fPIC -flto -march=armv8-a -mtune=cortex-a72
 [[tool.cibuildwheel.overrides]]
 select = "*linux_armv7l *linux_ppc64le *linux_riscv64"
 inherit.environment = "append"
-environment.LXML_LIMITED_API = "3.12"
+environment.LXML_LIMITED_API = "true"
 inherit.test-requires = "append"
 test-requires = ["abi3audit>=0.0.22"]
 inherit.test-command = "append"
