@@ -39,7 +39,7 @@ class XMLSyntaxError(ParseError):
     """Syntax error while parsing an XML document.
     """
 
-cdef class ParserError(LxmlError):
+class ParserError(LxmlError):
     """Internal lxml parser error.
     """
 
@@ -195,6 +195,13 @@ __GLOBAL_PARSER_CONTEXT.initMainParserContext()
 # name of Python Py_UNICODE encoding as known to libxml2
 cdef const_char* _PY_UNICODE_ENCODING = NULL
 
+cdef extern from *:
+    """
+    #if defined(Py_LIMITED_API)
+        #define  Py_UNICODE wchar_t
+    #endif
+    """
+
 cdef int _setupPythonUnicode() except -1:
     """Sets _PY_UNICODE_ENCODING to the internal encoding name of Python unicode
     strings if libxml2 supports reading native Python unicode.  This depends
@@ -292,19 +299,19 @@ _pyucs4_encoding_name = _find_PyUCS4EncodingName()
 @cython.internal
 cdef class _FileReaderContext:
     cdef object _filelike
-    cdef object _encoding
-    cdef object _url
-    cdef object _bytes
+    cdef bytes _encoding
+    cdef bytes _url
+    cdef bytes _bytes
     cdef _ExceptionContext _exc_context
     cdef Py_ssize_t _bytes_read
-    cdef char* _c_url
+    cdef const char* _c_url
     cdef bint _close_file_after_read
 
     def __cinit__(self, filelike, exc_context not None, url, encoding=None, bint close_file=False):
         self._exc_context = exc_context
         self._filelike = filelike
         self._close_file_after_read = close_file
-        self._encoding = encoding
+        self._encoding = _utf8orNone(encoding)
         if url is not None:
             url = _encodeFilename(url)
             self._c_url = _cstr(url)
@@ -348,7 +355,17 @@ cdef class _FileReaderContext:
     cdef xmlDoc* _readDoc(self, xmlparser.xmlParserCtxt* ctxt, int options) noexcept:
         cdef xmlDoc* result
         cdef void* c_callback_context = <python.PyObject*> self
-        cdef char* c_encoding = _cstr(self._encoding) if self._encoding is not None else NULL
+        cdef const char* c_encoding
+
+        if self._encoding is not None:
+            c_encoding = _cstr(self._encoding)
+        else:
+            try:
+                self._bytes = self._readBytes(16)
+                self._bytes_read = _detectBOMEncoding(self._bytes, len(self._bytes), &c_encoding)
+            except:
+                self._exc_context._store_raised()
+                return NULL
 
         orig_options = ctxt.options
         with nogil:
@@ -373,14 +390,29 @@ cdef class _FileReaderContext:
         finally:
             return result  # swallow any exceptions
 
+    cdef bytes _readBytes(self, count):
+        data = self._filelike.read(count)
+        if isinstance(data, bytes):
+            return <bytes> data
+        elif isinstance(data, str):
+            if self._encoding is None:
+                return (<str> data).encode('utf8')
+            else:
+                return python.PyUnicode_AsEncodedString(
+                    data, _cstr(self._encoding), NULL)
+        else:
+            self._close_file()
+            raise TypeError, \
+                "reading from file-like objects must return byte strings or unicode strings"
+
     cdef int copyToBuffer(self, char* c_buffer, int c_requested) noexcept:
         cdef int c_byte_count = 0
-        cdef char* c_start
+        cdef const char* c_start
         cdef Py_ssize_t byte_count, remaining
         if self._bytes_read < 0:
             return 0
         try:
-            byte_count = python.PyBytes_GET_SIZE(self._bytes)
+            byte_count = len(self._bytes)
             remaining  = byte_count - self._bytes_read
             while c_requested > remaining:
                 c_start = _cstr(self._bytes) + self._bytes_read
@@ -389,20 +421,8 @@ cdef class _FileReaderContext:
                 c_buffer += remaining
                 c_requested -= remaining
 
-                self._bytes = self._filelike.read(c_requested)
-                if not isinstance(self._bytes, bytes):
-                    if isinstance(self._bytes, unicode):
-                        if self._encoding is None:
-                            self._bytes = (<unicode>self._bytes).encode('utf8')
-                        else:
-                            self._bytes = python.PyUnicode_AsEncodedString(
-                                self._bytes, _cstr(self._encoding), NULL)
-                    else:
-                        self._close_file()
-                        raise TypeError, \
-                            "reading from file-like objects must return byte strings or unicode strings"
-
-                remaining = python.PyBytes_GET_SIZE(self._bytes)
+                data = self._bytes = self._readBytes(c_requested)
+                remaining = len(data)
                 if remaining == 0:
                     self._bytes_read = -1
                     self._close_file()
@@ -410,7 +430,7 @@ cdef class _FileReaderContext:
                 self._bytes_read = 0
 
             if c_requested > 0:
-                c_start = _cstr(self._bytes) + self._bytes_read
+                c_start = _cstr(data) + self._bytes_read
                 cstring_h.memcpy(c_buffer, c_start, c_requested)
                 c_byte_count += c_requested
                 self._bytes_read += c_requested
@@ -426,6 +446,23 @@ cdef class _FileReaderContext:
 
 cdef int _readFilelikeParser(void* ctxt, char* c_buffer, int c_size) noexcept with gil:
     return (<_FileReaderContext>ctxt).copyToBuffer(c_buffer, c_size)
+
+
+@cython.final
+@cython.internal
+cdef class _UnicodeStringReader:
+    cdef str _data
+    cdef Py_ssize_t _pos
+
+    def __cinit__(self, unicode_string: str):
+        self._data = unicode_string
+
+    def read(self, int count):
+        cdef Py_ssize_t pos = self._pos
+        if pos >= len(self._data):
+            return b''
+        self._pos = pos + count
+        return self._data[pos: pos+count].encode('utf8')
 
 
 ############################################################
@@ -472,7 +509,8 @@ cdef xmlparser.xmlParserInput* _local_resolver(const_char* c_url, const_char* c_
 
     if doc_ref is not None:
         if doc_ref._type == PARSER_DATA_STRING:
-            data = doc_ref._data_bytes
+            data_bytes = doc_ref._data_bytes
+            data = data_bytes
             filename = doc_ref._filename
             if not filename:
                 filename = None
@@ -485,14 +523,14 @@ cdef xmlparser.xmlParserInput* _local_resolver(const_char* c_url, const_char* c_
             if tree.LIBXML_VERSION >= 21400:
                 c_filename = <char *>tree.xmlStrdup(_xcstr(filename)) if filename is not None else NULL
                 c_input = xmlparser.xmlNewInputFromMemory(
-                    c_filename, _xcstr(data), <size_t> python.PyBytes_GET_SIZE(data), 0)
+                    c_filename, _xcstr(data_bytes), <size_t> len(data_bytes), 0)
             else:
                 c_input = xmlparser.xmlNewInputStream(c_context)
                 if c_input is not NULL:
                     if filename is not None:
                         c_input.filename = <char *>tree.xmlStrdup(_xcstr(filename))
-                    c_input.base = _xcstr(data)
-                    c_input.length = python.PyBytes_GET_SIZE(data)
+                    c_input.base = _xcstr(data_bytes)
+                    c_input.length = len(data_bytes)
                     c_input.cur = c_input.base
                     c_input.end = c_input.base + c_input.length
         elif doc_ref._type == PARSER_DATA_FILENAME:
@@ -1020,7 +1058,7 @@ cdef class _BaseParser:
 
     cdef xmlparser.xmlParserCtxt* _newPushParserCtxt(self) except NULL:
         cdef xmlparser.xmlParserCtxt* c_ctxt
-        cdef char* c_filename = _cstr(self._filename) if self._filename is not None else NULL
+        cdef const char* c_filename = _cstr(self._filename) if self._filename is not None else NULL
         if self._flags.for_html:
             c_ctxt = htmlparser.htmlCreatePushParserCtxt(
                 NULL, NULL, NULL, 0, c_filename, tree.XML_CHAR_ENCODING_NONE)
@@ -1113,7 +1151,7 @@ cdef class _BaseParser:
 
     # internal parser methods
 
-    cdef xmlDoc* _parseUnicodeDoc(self, utext, char* c_filename) except NULL:
+    cdef xmlDoc* _parseUnicodeDoc(self, utext, const char* c_filename) except NULL:
         """Parse unicode document, share dictionary if possible.
         """
         cdef _ParserContext context
@@ -1178,40 +1216,23 @@ cdef class _BaseParser:
         finally:
             context.cleanup()
 
-    cdef xmlDoc* _parseDoc(self, const char* c_text, int c_len, char* c_filename) except NULL:
+    cdef xmlDoc* _parseDoc(self, const char* c_text, int c_len, const char* c_filename) except NULL:
         """Parse document, share dictionary if possible.
         """
         cdef _ParserContext context
         cdef xmlDoc* result
         cdef xmlparser.xmlParserCtxt* pctxt
-        cdef char* c_encoding
+        cdef const char* c_encoding
         cdef tree.xmlCharEncoding enc
         context = self._getParserContext()
         context.prepare()
         try:
-            if self._default_encoding is None:
-                c_encoding = NULL
-                # libxml2 (at least 2.9.3) does not recognise UTF-32 BOMs
-                # NOTE: limit to problematic cases because it changes character offsets
-                if c_len >= 4 and (c_text[0] == b'\xFF' and c_text[1] == b'\xFE' and
-                                   c_text[2] == 0 and c_text[3] == 0):
-                    c_encoding = "UTF-32LE"
-                    c_text += 4
-                    c_len -= 4
-                elif c_len >= 4 and (c_text[0] == 0 and c_text[1] == 0 and
-                                     c_text[2] == b'\xFE' and c_text[3] == b'\xFF'):
-                    c_encoding = "UTF-32BE"
-                    c_text += 4
-                    c_len -= 4
-                else:
-                    # no BOM => try to determine encoding
-                    enc = tree.xmlDetectCharEncoding(<const_xmlChar*>c_text, c_len)
-                    if enc == tree.XML_CHAR_ENCODING_UCS4LE:
-                        c_encoding = 'UTF-32LE'
-                    elif enc == tree.XML_CHAR_ENCODING_UCS4BE:
-                        c_encoding = 'UTF-32BE'
-            else:
+            if self._default_encoding is not None:
                 c_encoding = _cstr(self._default_encoding)
+            else:
+                bom_offset = _detectBOMEncoding(c_text, c_len, &c_encoding)
+                c_text += bom_offset
+                c_len -= bom_offset
 
             pctxt = context._c_ctxt
             orig_options = pctxt.options
@@ -1234,19 +1255,17 @@ cdef class _BaseParser:
         finally:
             context.cleanup()
 
-    cdef xmlDoc* _parseDocFromFile(self, char* c_filename) except NULL:
+    cdef xmlDoc* _parseDocFromFile(self, const char* c_filename) except NULL:
         cdef _ParserContext context
         cdef xmlDoc* result
         cdef xmlparser.xmlParserCtxt* pctxt
-        cdef char* c_encoding
+        cdef const char* c_encoding = NULL
         result = NULL
 
         context = self._getParserContext()
         context.prepare()
         try:
-            if self._default_encoding is None:
-                c_encoding = NULL
-            else:
+            if self._default_encoding is not None:
                 c_encoding = _cstr(self._default_encoding)
 
             pctxt = context._c_ctxt
@@ -1268,12 +1287,10 @@ cdef class _BaseParser:
         finally:
             context.cleanup()
 
-    cdef xmlDoc* _parseDocFromFilelike(self, filelike, filename,
-                                       encoding) except NULL:
+    cdef xmlDoc* _parseDocFromFilelike(self, filelike, filename, encoding) except NULL:
         cdef _ParserContext context
         cdef _FileReaderContext file_context
         cdef xmlDoc* result
-        cdef char* c_filename
         if not filename:
             filename = None
 
@@ -1326,7 +1343,7 @@ cdef tree.xmlEntity* _getInternalEntityOnly(void* ctxt, const_xmlChar* name) noe
             message=b"External entity resolution is disabled for security reasons "
                     b"when resolving '&%s;'. Use 'XMLParser(resolve_entities=True)' "
                     b"if you consider it safe to enable it.",
-            file=parser_input.filename,
+            file=<char*> parser_input.filename,
             node=entity,
             str1=<char*> name,
             str2=NULL,
@@ -1375,6 +1392,33 @@ cdef void _initSaxDocument(void* ctxt) noexcept with gil:
                 # already initialised but empty => clear
                 tree.xmlHashFree(c_doc.ids, NULL)
                 c_doc.ids = NULL
+
+
+cdef int _detectBOMEncoding(const char* c_text, int c_len, const char** c_encoding):
+    """Detect the text encoding and return the BOM length to skip, if any."""
+    # libxml2 (at least 2.9.3) does not recognise UTF-32 BOMs
+    # NOTE: limit to problematic cases because it changes character offsets
+    cdef const char* c_enc = NULL
+    cdef int offset = 0
+    if c_len >= 4 and (c_text[0] == b'\xFF' and c_text[1] == b'\xFE' and
+                            c_text[2] == 0 and c_text[3] == 0):
+        c_enc = "UTF-32LE"
+        offset = 4
+    elif c_len >= 4 and (c_text[0] == 0 and c_text[1] == 0 and
+                            c_text[2] == b'\xFE' and c_text[3] == b'\xFF'):
+        c_enc = "UTF-32BE"
+        offset = 4
+    else:
+        # no BOM => try to determine encoding
+        enc = tree.xmlDetectCharEncoding(<const_xmlChar*>c_text, c_len)
+        if enc == tree.XML_CHAR_ENCODING_UCS4LE:
+            c_enc = 'UTF-32LE'
+        elif enc == tree.XML_CHAR_ENCODING_UCS4BE:
+            c_enc = 'UTF-32BE'
+
+    if c_encoding is not NULL:
+        c_encoding[0] = c_enc
+    return offset
 
 
 ############################################################
@@ -1427,7 +1471,7 @@ cdef class _FeedParser(_BaseParser):
             else:
                 c_encoding = self._default_encoding
             char_data = _cstr(data)
-            py_buffer_len = python.PyBytes_GET_SIZE(data)
+            py_buffer_len = len(<bytes> data)
             ustart = 0
         elif isinstance(data, unicode):
             c_encoding = b"UTF-8"
@@ -1941,7 +1985,7 @@ cdef class HTMLPullParser(HTMLParser):
 ############################################################
 
 cdef xmlDoc* _parseDoc(text, filename, _BaseParser parser) except NULL:
-    cdef char* c_filename
+    cdef const char* c_filename
     if parser is None:
         parser = __GLOBAL_PARSER_CONTEXT.getDefaultParser()
     if not filename:
@@ -1950,14 +1994,18 @@ cdef xmlDoc* _parseDoc(text, filename, _BaseParser parser) except NULL:
         filename_utf = _encodeFilenameUTF8(filename)
         c_filename = _cstr(filename_utf)
     if isinstance(text, bytes):
+        if python.IN_LIMITED_API:
+            return parser._parseDocFromFilelike(BytesIO(text), filename, None)
         return _parseDoc_bytes(<bytes> text, filename, c_filename, parser)
     elif isinstance(text, unicode):
+        if python.IN_LIMITED_API:
+            return parser._parseDocFromFilelike(_UnicodeStringReader(text), filename, b'utf-8')
         return _parseDoc_unicode(<unicode> text, filename, c_filename, parser)
     else:
         return _parseDoc_charbuffer(text, filename, c_filename, parser)
 
 
-cdef xmlDoc* _parseDoc_unicode(unicode text, filename, char* c_filename, _BaseParser parser) except NULL:
+cdef xmlDoc* _parseDoc_unicode(text: str, filename, const char* c_filename, _BaseParser parser) except NULL:
     cdef Py_ssize_t c_len
     if python.PyUnicode_IS_READY(text):
         # PEP-393 Unicode string
@@ -1966,19 +2014,18 @@ cdef xmlDoc* _parseDoc_unicode(unicode text, filename, char* c_filename, _BasePa
         # old Py_UNICODE string
         c_len = python.PyUnicode_GET_DATA_SIZE(text)
     if c_len > limits.INT_MAX:
-        return parser._parseDocFromFilelike(
-            StringIO(text), filename, None)
+        return parser._parseDocFromFilelike(_UnicodeStringReader(text), filename, None)
     return parser._parseUnicodeDoc(text, c_filename)
 
 
-cdef xmlDoc* _parseDoc_bytes(bytes text, filename, char* c_filename, _BaseParser parser) except NULL:
+cdef xmlDoc* _parseDoc_bytes(text: bytes, filename, const char* c_filename, _BaseParser parser) except NULL:
     cdef Py_ssize_t c_len = len(text)
     if c_len > limits.INT_MAX:
         return parser._parseDocFromFilelike(BytesIO(text), filename, None)
     return parser._parseDoc(text, c_len, c_filename)
 
 
-cdef xmlDoc* _parseDoc_charbuffer(text, filename, char* c_filename, _BaseParser parser) except NULL:
+cdef xmlDoc* _parseDoc_charbuffer(text, filename, const char* c_filename, _BaseParser parser) except NULL:
     cdef const unsigned char[::1] data = memoryview(text).cast('B')  # cast to 'unsigned char' buffer
     cdef Py_ssize_t c_len = len(data)
     if c_len > limits.INT_MAX:
@@ -2096,7 +2143,7 @@ cdef _Document _parseDocument(source, _BaseParser parser, base_url):
     if hasattr(source, 'read'):
         return _parseFilelikeDocument(source, url, parser)
 
-    raise TypeError, f"cannot parse from '{python._fqtypename(source).decode('UTF-8')}'"
+    raise TypeError, f"cannot parse from '{python._fqtypename(source)}'"
 
 cdef _Document _parseDocumentFromURL(url, _BaseParser parser):
     c_doc = _parseDocFromFile(url, parser)

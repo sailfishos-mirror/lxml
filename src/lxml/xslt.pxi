@@ -2,15 +2,15 @@
 from lxml.includes cimport xslt
 
 
-cdef class XSLTError(LxmlError):
+class XSLTError(LxmlError):
     """Base class of all XSLT errors.
     """
 
-cdef class XSLTParseError(XSLTError):
+class XSLTParseError(XSLTError):
     """Error parsing a stylesheet document.
     """
 
-cdef class XSLTApplyError(XSLTError):
+class XSLTApplyError(XSLTError):
     """Error running an XSL transformation.
     """
 
@@ -18,7 +18,7 @@ class XSLTSaveError(XSLTError, SerialisationError):
     """Error serialising an XSLT result.
     """
 
-cdef class XSLTExtensionError(XSLTError):
+class XSLTExtensionError(XSLTError):
     """Error registering an XSLT extension.
     """
 
@@ -254,7 +254,7 @@ cdef class XSLTAccessControl:
     def __repr__(self):
         items = sorted(self.options.items())
         return "%s(%s)" % (
-            python._fqtypename(self).decode('UTF-8').split('.')[-1],
+            python._typename(self),
             ', '.join(["%s=%r" % item for item in items]))
 
 

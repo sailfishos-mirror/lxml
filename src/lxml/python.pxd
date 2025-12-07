@@ -5,7 +5,13 @@ cimport cython
 
 cdef extern from "Python.h":
     """
-    #if PY_VERSION_HEX >= 0x030C0000
+    #if defined(Py_LIMITED_API)
+      #define LXML_IN_LIMITED_API 1
+    #else
+      #define LXML_IN_LIMITED_API 0
+    #endif
+
+    #if defined(Py_LIMITED_API) || PY_VERSION_HEX >= 0x030C0000
       #undef PyUnicode_IS_READY
       #define PyUnicode_IS_READY(s)  (1)
       #undef PyUnicode_READY
@@ -17,12 +23,24 @@ cdef extern from "Python.h":
       #undef PyUnicode_GET_SIZE
       #define PyUnicode_GET_SIZE(s)  (0)
     #endif
+
+    #if defined(Py_LIMITED_API)
+      #undef PyUnicode_MAX_CHAR_VALUE
+      #define PyUnicode_MAX_CHAR_VALUE(s)  (0)
+      #undef PyUnicode_GET_LENGTH
+      #define PyUnicode_GET_LENGTH(s)  (0)
+      #undef PyUnicode_KIND
+      #define PyUnicode_KIND(s)  (0)
+      #undef PyUnicode_DATA
+      #define PyUnicode_DATA(s)  (0)
+    #endif
     """
 
     ctypedef struct PyObject
     cdef const Py_ssize_t PY_SSIZE_T_MIN
     cdef const Py_ssize_t PY_SSIZE_T_MAX
     cdef const int PY_VERSION_HEX
+    cdef const bint IN_LIMITED_API "LXML_IN_LIMITED_API"
 
     cdef void Py_INCREF(object o)
     cdef void Py_DECREF(object o)
@@ -78,8 +96,8 @@ cdef extern from "Python.h":
     cdef bint PySequence_Check(object instance)
     cdef bint PyType_Check(object instance)
     cdef bint PyTuple_CheckExact(object instance)
+    cdef bint PyIndex_Check(object instance)
 
-    cdef int _PyEval_SliceIndex(object value, Py_ssize_t* index) except 0
     cdef int PySlice_GetIndicesEx(
             object slice, Py_ssize_t length,
             Py_ssize_t *start, Py_ssize_t *stop, Py_ssize_t *step,
@@ -100,8 +118,8 @@ cdef extern from "Python.h":
     cdef PyObject* PyThreadState_GetDict()
 
     # some handy functions
-    cdef char* _cstr "PyBytes_AS_STRING" (object s)
-    cdef char* __cstr "PyBytes_AS_STRING" (PyObject* s)
+    cdef const char* _cstr "__Pyx_PyBytes_AsString" (object s)
+    cdef const char* __cstr "__Pyx_PyBytes_AsString" (PyObject* s)
 
     # Py_buffer related flags
     cdef const int PyBUF_SIMPLE
@@ -159,7 +177,8 @@ cdef extern from "etree_defs.h": # redefines some functions as macros
     cdef void lxml_free(void* mem)
     cdef void* lxml_unpack_xmldoc_capsule(object capsule, bint* is_owned) except? NULL
     cdef bint _isString(object obj)
-    cdef const_char* _fqtypename(object t)
+    cdef str _typename "__lxml_typename" (object t)
+    cdef str _fqtypename "__lxml_fqtypename" (object t)
     cdef bint IS_PYPY
     cdef object PyOS_FSPath(object obj)
 

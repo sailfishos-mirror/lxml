@@ -65,8 +65,9 @@ cdef class _IDDict:
     that were created or modified 'by hand' are not supported.
     """
     cdef _Document _doc
-    cdef object _keys
-    cdef object _items
+    cdef list _keys
+    cdef list _items
+
     def __cinit__(self, etree):
         cdef _Document doc
         doc = _documentOrRaise(etree)
@@ -138,25 +139,22 @@ cdef class _IDDict:
         return iter(self._items)
 
     def values(self):
-        cdef list values = []
         if self._items is None:
             self._items = self._build_items()
-        for item in self._items:
-            value = python.PyTuple_GET_ITEM(item, 1)
-            python.Py_INCREF(value)
-            values.append(value)
-        return values
+        return [(<tuple> item)[1] for item in self._items]
 
     def itervalues(self):
         return iter(self.values())
 
-    cdef object _build_keys(self):
+    @cython.final
+    cdef list _build_keys(self):
         keys = []
         tree.xmlHashScan(<tree.xmlHashTable*>self._doc._c_doc.ids,
                          <tree.xmlHashScanner>_collectIdHashKeys, <python.PyObject*>keys)
         return keys
 
-    cdef object _build_items(self):
+    @cython.final
+    cdef list _build_items(self):
         items = []
         context = (items, self._doc)
         tree.xmlHashScan(<tree.xmlHashTable*>self._doc._c_doc.ids,

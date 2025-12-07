@@ -85,7 +85,7 @@ jobs:
     # This enables the next step to run cibuildwheel in parallel.
     # From https://iscinumpy.dev/post/cibuildwheel-2-10-0/#only-210
     name: Generate wheels matrix
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     outputs:
       include: ${{ steps.set-matrix.outputs.include }}
     steps:
@@ -97,15 +97,14 @@ jobs:
         run: |
           MATRIX=$(
             {
-              cibuildwheel --print-build-identifiers --platform linux \
-              | jq -nRc '{"only": inputs, "os": "ubuntu-22.04"}' \
-              | sed -e '/aarch64\|armv7l/s|ubuntu-22.04|ubuntu-22.04-arm|' \
-              && cibuildwheel --print-build-identifiers --platform macos \
+              cibuildwheel --print-build-identifiers --platform linux --archs "x86_64,aarch64" \
+              | grep -v musllinux \
+              | jq -nRc '{"only": inputs, "os": "ubuntu-latest"}' \
+              | sed -e '/aarch64/s|ubuntu-latest|ubuntu-24.04-arm|' \
+              && cibuildwheel --print-build-identifiers --platform macos --archs arm64 \
               | jq -nRc '{"only": inputs, "os": "macos-latest"}' \
-              && cibuildwheel --print-build-identifiers --platform windows \
-              | jq -nRc '{"only": inputs, "os": "windows-2022"}' \
-              && cibuildwheel --print-build-identifiers --platform windows --archs ARM64 \
-              | jq -nRc '{"only": inputs, "os": "windows-11-arm"}'
+              && cibuildwheel --print-build-identifiers --platform windows --archs AMD64 \
+              | jq -nRc '{"only": inputs, "os": "windows-2022"}'
             } | jq -sc
           )
           echo "include=$MATRIX"
@@ -149,8 +148,6 @@ jobs:
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v3.3.0
-        env:
-          GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           only: ${{ matrix.only }}
 
@@ -173,14 +170,10 @@ jobs:
         env:
           CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_28
           CIBW_MANYLINUX_AARCH64_IMAGE: manylinux_2_28
-          CIBW_MANYLINUX_PPC64LE_IMAGE: manylinux_2_28
-          CIBW_MANYLINUX_S390X_IMAGE: manylinux_2_28
           CIBW_MANYLINUX_PYPY_X86_64_IMAGE: manylinux_2_28
           CIBW_MANYLINUX_PYPY_AARCH64_IMAGE: manylinux_2_28
           CIBW_MUSLLINUX_X86_64_IMAGE: musllinux_1_2
           CIBW_MUSLLINUX_AARCH64_IMAGE: musllinux_1_2
-          CIBW_MUSLLINUX_PPC64LE_IMAGE: musllinux_1_2
-          CIBW_MUSLLINUX_S390X_IMAGE: musllinux_1_2
         with:
           only: ${{ matrix.only }}
 
@@ -190,9 +183,70 @@ jobs:
           path: ./wheelhouse/*.whl
           name: lxml-wheel-${{ matrix.only }}
 
+  build_abi3_wheels:
+    name: Build abi3 wheels on ${{ matrix.os == 'ubuntu-24.04' && 'ubuntu-qemu' || matrix.os }}
+    needs: [ cache_libs ]
+    runs-on: ${{ matrix.os }}
+
+    env:
+      ZLIB_VERSION: ${{ needs.cache_libs.outputs.ZLIB_VERSION }}
+      LIBICONV_VERSION: ${{ needs.cache_libs.outputs.LIBICONV_VERSION }}
+      LIBXML2_VERSION: ${{ needs.cache_libs.outputs.LIBXML2_VERSION }}
+      LIBXSLT_VERSION: ${{ needs.cache_libs.outputs.LIBXSLT_VERSION }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - 'ubuntu-latest'
+          - 'ubuntu-24.04'  # for emulated builds
+          - 'ubuntu-24.04-arm'
+          - 'windows-latest'
+          - 'windows-11-arm'
+          - 'macos-latest'
+
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v6
+
+      - name: Cache [libs]
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: |
+            libs/*.xz
+            libs/*.gz
+            libs/*.zip
+          key: libs-${{ runner.os }}-${{ runner.arch }}-${{ env.LIBXML2_VERSION }}-${{ env.LIBXSLT_VERSION }}
+
+      - name: Set up QEMU
+        if: runner.os == 'Linux'
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: all
+
+      - name: Build ABI3 wheels
+        uses: pypa/cibuildwheel@v3.3.0
+        env:
+          # Smaller set of platforms that we only provide Stable ABI wheels for
+          CIBW_BUILD: |
+            ${{
+                matrix.os == 'ubuntu-latest' && 'cp312-*linux_i686 cp312-musllinux_x86_64' ||
+                matrix.os == 'ubuntu-24.04-arm' && 'cp312-*armv7l cp312-musllinux_aarch64' ||
+                matrix.os == 'ubuntu-24.04' && 'cp312-manylinux_ppc64le cp312-manylinux_riscv64' ||
+                matrix.os == 'windows-latest' && 'cp312-*win32' ||
+                matrix.os == 'windows-11-arm' && 'cp312-*win_arm64' ||
+                matrix.os == 'macos-latest' && 'cp312-*macosx_x86_64' ||
+            '' }}
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          path: ./wheelhouse/*.whl
+          name: lxml-wheel-abi3-${{ matrix.os }}
+
   upload_release_assets:
     name: Upload Release Assets
-    needs: [ sdist, build_wheels ]
+    needs: [ sdist, build_wheels, build_abi3_wheels ]
     runs-on: ubuntu-latest
 
     permissions:

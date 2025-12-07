@@ -1,18 +1,18 @@
 # support for extension functions in XPath and XSLT
 
-cdef class XPathError(LxmlError):
+class XPathError(LxmlError):
     """Base class of all XPath errors.
     """
 
-cdef class XPathEvalError(XPathError):
+class XPathEvalError(XPathError):
     """Error during XPath evaluation.
     """
 
-cdef class XPathFunctionError(XPathEvalError):
+class XPathFunctionError(XPathEvalError):
     """Internal error looking up an XPath extension function.
     """
 
-cdef class XPathResultError(XPathEvalError):
+class XPathResultError(XPathEvalError):
     """Error handling an XPath result.
     """
 
@@ -198,7 +198,7 @@ cdef class _BaseContext:
                 self._xpathCtxt, _xcstr(prefix_utf), _xcstr(ns_uri_utf))
 
     cdef registerGlobalNamespaces(self):
-        cdef list ns_prefixes = _find_all_extension_prefixes()
+        ns_prefixes: list = _find_all_extension_prefixes()
         if ns_prefixes:
             for prefix_utf, ns_uri_utf in ns_prefixes:
                 self._global_namespaces.append(prefix_utf)
@@ -403,7 +403,7 @@ cdef void _forwardXPathError(void* c_ctxt, const xmlerror.xmlError* c_error) noe
     else:
         xpath_code = c_error.code - xmlerror.XML_XPATH_EXPRESSION_OK
         if 0 <= xpath_code < len(LIBXML2_XPATH_ERROR_MESSAGES):
-            error.message = _cstr(LIBXML2_XPATH_ERROR_MESSAGES[xpath_code])
+            error.message = <char*> _cstr(LIBXML2_XPATH_ERROR_MESSAGES[xpath_code])
         else:
             error.message = b"unknown error"
     error.domain = c_error.domain
@@ -606,7 +606,7 @@ cdef xpath.xmlXPathObject* _wrapXPathObject(object obj, _Document doc,
             xpath.xmlXPathFreeNodeSet(resultSet)
             raise
     else:
-        raise XPathResultError, f"Unknown return type: {python._fqtypename(obj).decode('utf8')}"
+        raise XPathResultError, f"Unknown return type: {python._fqtypename(obj)}"
     return xpath.xmlXPathWrapNodeSet(resultSet)
 
 
@@ -722,8 +722,26 @@ cdef _Element _instantiateElementFromXPath(xmlNode* c_node, _Document doc,
 ################################################################################
 # special str/unicode subclasses
 
+cdef extern from *:
+    """
+    /* Fake PyUnicodeObject struct declaration that is at least as large as the original. */
+    #if defined(Py_LIMITED_API)
+        typedef struct {
+            PyObject_HEAD
+            Py_ssize_t length;
+            Py_hash_t hash;
+            Py_ssize_t state;
+            Py_ssize_t utf8_length;
+            char *utf8;
+            void *data;
+            PyObject *more1;
+        } __lxml_PyUnicodeObject;
+        #define PyUnicodeObject __lxml_PyUnicodeObject
+    #endif
+    """
+
 @cython.final
-cdef class _ElementUnicodeResult(unicode):
+cdef class __ElementUnicodeResultC(str):
     cdef _Element _parent
     cdef readonly object attrname
     cdef readonly bint is_tail
@@ -740,12 +758,37 @@ cdef class _ElementUnicodeResult(unicode):
         return self.attrname is not None
 
 
+class __ElementUnicodeResultPy(str):
+    # Implementation for Limited API
+    def getparent(self):
+        return self._parent
+
+    @property
+    def is_text(self):
+        return self._parent is not None and not (self.is_tail or self.attrname is not None)
+
+    @property
+    def is_attribute(self):
+        return self.attrname is not None
+
+
+_ElementUnicodeResult = __ElementUnicodeResultPy if python.IN_LIMITED_API else __ElementUnicodeResultC
+
+
 cdef object _elementStringResultFactory(string_value, _Element parent,
                                         attrname, bint is_tail):
-    result = _ElementUnicodeResult(string_value)
+    if python.IN_LIMITED_API:
+        pyresult = __ElementUnicodeResultPy(string_value)
+        pyresult._parent = parent
+        pyresult.attrname = attrname
+        pyresult.is_tail = is_tail
+        return pyresult
+
+    cdef __ElementUnicodeResultC result
+    result = __ElementUnicodeResultC(string_value)
     result._parent = parent
-    result.is_tail = is_tail
     result.attrname = attrname
+    result.is_tail = is_tail
     return result
 
 
