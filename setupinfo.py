@@ -351,6 +351,8 @@ def define_macros():
                 f"expected Python version like '3.12', got {OPTION_LIMITED_API!r}")
         pymajor, pyminor = OPTION_LIMITED_API.split('.')
         macros.append(('Py_LIMITED_API', f"0x{int(pymajor):02x}{int(pyminor):02x}0000"))
+        # Note: this makes the '_Document' type ABI incompatible in abi3 wheels!
+        macros.append(('CYTHON_UNSAFE_IGNORE_PYMUTEX_ABI_COMPATIBILITY', '1'))
     if OPTION_WITH_REFNANNY:
         macros.append(('CYTHON_REFNANNY', None))
     if OPTION_WITH_UNICODE_STRINGS:
