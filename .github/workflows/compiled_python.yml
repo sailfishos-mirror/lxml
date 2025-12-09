@@ -45,12 +45,6 @@ jobs:
       PYTHON_VERSION: 3.x-dev
       CONFIGURE_ARGS: --with-pydebug
       SANITIZER_CFLAGS: ""
-      COVERAGE: false
-      LXML_CSTD: c11
-      ZLIB_VERSION: ${{ input.ZLIB_VERSION }}
-      LIBICONV_VERSION: ${{ input.LIBICONV_VERSION }}
-      LIBXML2_VERSION: ${{ input.LIBXML2_VERSION }}
-      LIBXSLT_VERSION: ${{ input.LIBXSLT_VERSION }}
 
     steps:
       - name: Checkout repo
@@ -144,6 +138,13 @@ jobs:
           key: libs-${{ runner.os }}-${{ runner.arch }}-${{ env.LIBXML2_VERSION }}-${{ env.LIBXSLT_VERSION }}
 
       - name: Run CI
+        env:
+          COVERAGE: false
+          LXML_CSTD: c11
+          ZLIB_VERSION: ${{ input.ZLIB_VERSION }}
+          LIBICONV_VERSION: ${{ input.LIBICONV_VERSION }}
+          LIBXML2_VERSION: ${{ input.LIBXML2_VERSION }}
+          LIBXSLT_VERSION: ${{ input.LIBXSLT_VERSION }}
         run: |
           cd "${GITHUB_WORKSPACE}/"
           bash -c 'source venv_pydebug/bin/activate; GITHUB_API_TOKEN="${{ secrets.GITHUB_TOKEN }}"  bash ./tools/ci-run.sh'
