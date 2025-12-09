@@ -146,6 +146,7 @@ jobs:
         env:
           COVERAGE: false
           LXML_CSTD: c11
+          STATIC_DEPS: true
           ZLIB_VERSION: ${{ inputs.ZLIB_VERSION }}
           LIBICONV_VERSION: ${{ inputs.LIBICONV_VERSION }}
           LIBXML2_VERSION: ${{ inputs.LIBXML2_VERSION }}
