@@ -151,8 +151,9 @@ def ext_modules(static_include_dirs, static_library_dirs,
 
     cythonize_directives = {
         'binding': True,
-        'freethreading_compatible': sys.version_info >= (3,14),
     }
+    if sys.version_info >= (3,14):
+        cythonize_directives['freethreading_compatible'] = True
     if OPTION_WITH_COVERAGE:
         cythonize_directives['linetrace'] = True
 
