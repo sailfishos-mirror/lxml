@@ -18,6 +18,22 @@ on:
       name:
         required: true
         type: string
+      ZLIB_VERSION:
+        required: false
+        default:
+        type: string
+      LIBICONV_VERSION:
+        required: false
+        default:
+        type: string
+      LIBXML2_VERSION:
+        required: false
+        default:
+        type: string
+      LIBXSLT_VERSION:
+        required: false
+        default:
+        type: string
 
 jobs:
   do_run:
@@ -29,6 +45,12 @@ jobs:
       PYTHON_VERSION: 3.x-dev
       CONFIGURE_ARGS: --with-pydebug
       SANITIZER_CFLAGS: ""
+      COVERAGE: false
+      LXML_CSTD: c11
+      ZLIB_VERSION: ${{ input.ZLIB_VERSION }}
+      LIBICONV_VERSION: ${{ input.LIBICONV_VERSION }}
+      LIBXML2_VERSION: ${{ input.LIBXML2_VERSION }}
+      LIBXSLT_VERSION: ${{ input.LIBXSLT_VERSION }}
 
     steps:
       - name: Checkout repo

@@ -296,14 +296,11 @@ jobs:
     uses: ./.github/workflows/compiled_python.yml
     with:
       name: pydebug
-    secrets: inherit
-    env:
-      LXML_CSTD: c11
-      COVERAGE: false
       ZLIB_VERSION: ${{ needs.cache_libs.outputs.ZLIB_VERSION }}
       LIBICONV_VERSION: ${{ needs.cache_libs.outputs.LIBICONV_VERSION }}
       LIBXML2_VERSION: ${{ needs.cache_libs.outputs.LIBXML2_VERSION }}
       LIBXSLT_VERSION: ${{ needs.cache_libs.outputs.LIBXSLT_VERSION }}
+    secrets: inherit
 
   pydebug-ft:
     needs: [ cache_libs ]
@@ -311,11 +308,8 @@ jobs:
     with:
       name: pydebug
       sanitize: ft
-    secrets: inherit
-    env:
-      LXML_CSTD: c11
-      COVERAGE: false
       ZLIB_VERSION: ${{ needs.cache_libs.outputs.ZLIB_VERSION }}
       LIBICONV_VERSION: ${{ needs.cache_libs.outputs.LIBICONV_VERSION }}
       LIBXML2_VERSION: ${{ needs.cache_libs.outputs.LIBXML2_VERSION }}
       LIBXSLT_VERSION: ${{ needs.cache_libs.outputs.LIBXSLT_VERSION }}
+    secrets: inherit
