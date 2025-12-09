@@ -1,4 +1,5 @@
 # cython: freethreading_compatible=True
+# distutils: define_macros=LXML_LOCK_PERFORMANCE=1
 
 cimport cython
 
