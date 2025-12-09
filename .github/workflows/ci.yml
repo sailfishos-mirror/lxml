@@ -7,12 +7,14 @@ on:
       - '!.github/**'
       - '.github/workflows/ci.yml'
       - '.github/workflows/cache_libs.yml'
+      - '.github/workflows/compiled_python.yml'
   pull_request:
     paths:
       - '**'
       - '!.github/**'
       - '.github/workflows/ci.yml'
       - '.github/workflows/cache_libs.yml'
+      - '.github/workflows/compiled_python.yml'
   workflow_dispatch:
 
 concurrency:
