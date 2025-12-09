@@ -296,6 +296,7 @@ jobs:
     uses: ./.github/workflows/compiled_python.yml
     with:
       name: pydebug
+      freethreading: false
       ZLIB_VERSION: ${{ needs.cache_libs.outputs.ZLIB_VERSION }}
       LIBICONV_VERSION: ${{ needs.cache_libs.outputs.LIBICONV_VERSION }}
       LIBXML2_VERSION: ${{ needs.cache_libs.outputs.LIBXML2_VERSION }}
@@ -307,7 +308,7 @@ jobs:
     uses: ./.github/workflows/compiled_python.yml
     with:
       name: pydebug
-      sanitize: ft
+      freethreading: true
       ZLIB_VERSION: ${{ needs.cache_libs.outputs.ZLIB_VERSION }}
       LIBICONV_VERSION: ${{ needs.cache_libs.outputs.LIBICONV_VERSION }}
       LIBXML2_VERSION: ${{ needs.cache_libs.outputs.LIBXML2_VERSION }}

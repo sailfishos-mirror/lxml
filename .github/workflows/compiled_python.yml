@@ -7,6 +7,10 @@ on:
         required: false
         default:
         type: string
+      freethreading:
+        required: false
+        default: false
+        type: string
       compiler:
         required: false
         default:
@@ -66,7 +70,6 @@ jobs:
           echo "CC=$CC" >> $GITHUB_ENV
           echo "CXX=$CXX" >> $GITHUB_ENV
 
-
       - name: Set up sanitizer args
         if: ${{inputs.sanitize}}
         run: |
@@ -96,9 +99,7 @@ jobs:
           if [[ "${{inputs.sanitize}}" == *"thread"* ]]; then
             CONFIGURE_ARGS="$CONFIGURE_ARGS --with-thread-sanitizer"
             SANITIZER_CFLAGS="$SANITIZER_CFLAGS -fsanitize=thread"
-            if [[ "${{inputs.sanitize}}" == *"ft"* ]]; then
-              echo "PYTHON_VERSION=3.xt-dev" >> $GITHUB_ENV
-              CONFIGURE_ARGS="$CONFIGURE_ARGS --disable-gil"
+            if [[ "${{inputs.freethreading}}" == "true" ]]; then
               TSAN_SUPPRESSIONS="${GITHUB_WORKSPACE}/cpython_main/Tools/tsan/suppressions_free_threading.txt"
             else
               TSAN_SUPPRESSIONS="${GITHUB_WORKSPACE}/cpython_main/Tools/tsan/suppressions.txt"
@@ -122,6 +123,10 @@ jobs:
         run: |
           git clone https://github.com/python/cpython/ cpython_main
           cd cpython_main
+          if [[ "${{inputs.freethreading}}" == "true" ]]; then
+            echo "PYTHON_VERSION=3.xt-dev" >> $GITHUB_ENV
+            CONFIGURE_ARGS="$CONFIGURE_ARGS --disable-gil"
+          fi
           ./configure ${CONFIGURE_ARGS} --prefix=${GITHUB_WORKSPACE}/cpython_install CFLAGS="-O2 $EXTRA_CONFIGURE_CFLAGS"
           make -j8
           make install
