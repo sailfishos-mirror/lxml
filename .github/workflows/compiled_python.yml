@@ -141,10 +141,10 @@ jobs:
         env:
           COVERAGE: false
           LXML_CSTD: c11
-          ZLIB_VERSION: ${{ input.ZLIB_VERSION }}
-          LIBICONV_VERSION: ${{ input.LIBICONV_VERSION }}
-          LIBXML2_VERSION: ${{ input.LIBXML2_VERSION }}
-          LIBXSLT_VERSION: ${{ input.LIBXSLT_VERSION }}
+          ZLIB_VERSION: ${{ inputs.ZLIB_VERSION }}
+          LIBICONV_VERSION: ${{ inputs.LIBICONV_VERSION }}
+          LIBXML2_VERSION: ${{ inputs.LIBXML2_VERSION }}
+          LIBXSLT_VERSION: ${{ inputs.LIBXSLT_VERSION }}
         run: |
           cd "${GITHUB_WORKSPACE}/"
           bash -c 'source venv_pydebug/bin/activate; GITHUB_API_TOKEN="${{ secrets.GITHUB_TOKEN }}"  bash ./tools/ci-run.sh'
