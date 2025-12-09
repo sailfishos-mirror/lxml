@@ -25,6 +25,20 @@ cdef class _ExsltRegExp
 ################################################################################
 # Base class for XSLT and XPath evaluation contexts: functions, namespaces, ...
 
+cdef extern from *:
+    """
+    typedef struct {
+        unsigned int build_smart_strings:1;
+        unsigned int has_local_user_extensions:1;
+        unsigned int has_global_user_extensions:1;
+    } __lxml_XPathExtensionFlags;
+    """
+    ctypedef struct _XPathExtensionFlags "__lxml_XPathExtensionFlags" :
+        bint build_smart_strings
+        bint has_local_user_extensions
+        bint has_global_user_extensions
+
+
 @cython.internal
 cdef class _BaseContext:
     cdef xpath.xmlXPathContext* _xpathCtxt
@@ -35,13 +49,13 @@ cdef class _BaseContext:
     cdef dict _utf_refs
     cdef dict _function_cache
     cdef dict _eval_context_dict
-    cdef bint _build_smart_strings
-    cdef bint _has_user_extensions
     # for exception handling and temporary reference keeping:
     cdef _TempStore _temp_refs
     cdef set _temp_documents
     cdef _ExceptionContext _exc
     cdef _ErrorLog _error_log
+    cdef _XPathExtensionFlags _flags
+    cdef bint has_user_extensions
 
     def __init__(self, namespaces, extensions, error_log, enable_regexp,
                  build_smart_strings):
@@ -68,7 +82,6 @@ cdef class _BaseContext:
                     name_utf = self._to_utf(name)
                     new_extensions[(ns_utf, name_utf)] = function
             extensions = new_extensions or None
-            self._has_user_extensions = extensions is not None
 
         if namespaces is not None:
             if isinstance(namespaces, dict):
@@ -95,7 +108,10 @@ cdef class _BaseContext:
         self._namespaces = namespaces
         self._temp_refs  = _TempStore()
         self._temp_documents  = set()
-        self._build_smart_strings = build_smart_strings
+        self._flags.build_smart_strings = build_smart_strings
+        self._flags.has_local_user_extensions = extensions is not None
+        # 'self.has_user_extensions' is an or-joined public flag for (global|local)
+        self.has_user_extensions = self._flags.has_local_user_extensions
 
         if enable_regexp:
             _regexp = _ExsltRegExp()
@@ -107,8 +123,8 @@ cdef class _BaseContext:
             namespaces = self._namespaces[:]
         else:
             namespaces = None
-        context = self.__class__(namespaces, None, self._error_log, False,
-                                 self._build_smart_strings)
+        context = self.__class__(
+            namespaces, None, self._error_log, False, self._flags.build_smart_strings)
         if self._extensions is not None:
             context._extensions = self._extensions.copy()
         return context
@@ -224,10 +240,10 @@ cdef class _BaseContext:
         self._extensions[(ns_utf, name_utf)] = function
         return 0
 
-    cdef registerGlobalFunctions(self, void* ctxt,
-                                 _register_function reg_func):
+    cdef int registerGlobalFunctions(self, void* ctxt, _register_function reg_func):
         cdef python.PyObject* dict_result
         cdef dict d
+        cdef bint has_external_function = False
         for ns_utf, ns_functions in __FUNCTION_NAMESPACE_REGISTRIES.iteritems():
             dict_result = python.PyDict_GetItem(
                 self._function_cache, ns_utf)
@@ -239,13 +255,17 @@ cdef class _BaseContext:
             for name_utf, function in ns_functions.iteritems():
                 d[name_utf] = function
                 reg_func(ctxt, name_utf, ns_utf)
+                has_external_function = True
+        if has_external_function:
+            self._flags.has_global_user_extensions = True
+            self.has_user_extensions = True
+        return 0
 
-    cdef registerLocalFunctions(self, void* ctxt,
-                                _register_function reg_func):
+    cdef int registerLocalFunctions(self, void* ctxt, _register_function reg_func):
         cdef python.PyObject* dict_result
         cdef dict d
         if self._extensions is None:
-            return # done
+            return 0  # done
         last_ns = None
         d = None
         for (ns_utf, name_utf), function in self._extensions.iteritems():
@@ -260,20 +280,24 @@ cdef class _BaseContext:
                     self._function_cache[ns_utf] = d
             d[name_utf] = function
             reg_func(ctxt, name_utf, ns_utf)
+        return 0
 
-    cdef unregisterAllFunctions(self, void* ctxt,
-                                      _register_function unreg_func):
+    cdef int unregisterAllFunctions(self, void* ctxt, _register_function unreg_func):
         for ns_utf, functions in self._function_cache.iteritems():
             for name_utf in functions:
                 unreg_func(ctxt, name_utf, ns_utf)
+        return 0
 
-    cdef unregisterGlobalFunctions(self, void* ctxt,
-                                         _register_function unreg_func):
+    cdef int unregisterGlobalFunctions(self, void* ctxt, _register_function unreg_func):
+        self._flags.has_global_user_extensions = False
+        self.has_user_extensions = self._flags.has_local_user_extensions
+
         for ns_utf, functions in self._function_cache.items():
             for name_utf in functions:
                 if self._extensions is None or \
                        (ns_utf, name_utf) not in self._extensions:
                     unreg_func(ctxt, name_utf, ns_utf)
+        return 0
 
     @cython.final
     cdef _find_cached_function(self, const_xmlChar* c_ns_uri, const_xmlChar* c_name):
@@ -622,7 +646,7 @@ cdef object _unwrapXPathObject(xpath.xmlXPathObject* xpathObj,
         return xpathObj.floatval
     elif xpathObj.type == xpath.XPATH_STRING:
         stringval = funicode(xpathObj.stringval)
-        if context._build_smart_strings:
+        if context._flags.build_smart_strings:
             stringval = _elementStringResultFactory(
                 stringval, None, None, False)
         return stringval
@@ -815,7 +839,7 @@ cdef object _buildElementStringResult(_Document doc, xmlNode* c_node,
         c_element = _previousElement(c_node)
         is_tail = c_element is not NULL
 
-    if not context._build_smart_strings:
+    if not context._flags.build_smart_strings:
         return value
 
     if c_element is NULL:
