@@ -122,8 +122,6 @@ jobs:
           key: libs-${{ runner.os }}-${{ runner.arch }}-${{ env.LIBXML2_VERSION }}-${{ env.LIBXSLT_VERSION }}
 
       - name: Run CI
-        continue-on-error: ${{ matrix.allowed_failure || false }}
-        env: ${{ matrix.env }}
         run: |
           cd "${GITHUB_WORKSPACE}/"
           bash -c 'source venv_pydebug/bin/activate; GITHUB_API_TOKEN="${{ secrets.GITHUB_TOKEN }}"  bash ./tools/ci-run.sh'
