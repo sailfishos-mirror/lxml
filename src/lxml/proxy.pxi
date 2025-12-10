@@ -12,6 +12,8 @@ cdef inline _Element getProxy(xmlNode* c_node):
     #print "getProxy for:", <int>c_node
     if c_node is NULL or not hasProxy(c_node):
         return None
+    if not python.HAS_TryIncRef:
+        return <_Element> c_node._private
     if not python.PyUnstable_TryIncRef(<cpython.object.PyObject*> c_node._private):
         c_node._private = NULL
         return None

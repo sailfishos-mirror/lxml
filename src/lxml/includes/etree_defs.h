@@ -31,9 +31,9 @@
 #define va_charptr(ap) va_arg(ap, char *)
 
 #ifdef PYPY_VERSION
-#    define IS_PYPY 1
+#    define IS_PYPY (1)
 #else
-#    define IS_PYPY 0
+#    define IS_PYPY (0)
 #endif
 
 /* unused */

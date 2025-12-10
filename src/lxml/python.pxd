@@ -136,11 +136,15 @@ cdef extern from "Python.h":
 
 cdef extern from *:
     """
-    #if PY_VERSION_HEX < 0x030e0000 || !defined(Py_GIL_DISABLED)
+    #if !CYTHON_COMPILING_IN_CPYTHON || PY_VERSION_HEX < 0x030e0000 || !defined(Py_GIL_DISABLED)
         #define PyUnstable_EnableTryIncRef(obj)
         #define PyUnstable_TryIncRef(obj) (Py_INCREF(obj), 1)
+        #define __lxml_HAS_TryIncRef (0)
+    #else
+        #define __lxml_HAS_TryIncRef (1)
     #endif
     """
+    cdef const bint HAS_TryIncRef "__lxml_HAS_TryIncRef"
 
     void PyUnstable_EnableTryIncRef(object o)
     # Enables subsequent uses of PyUnstable_TryIncRef() on obj.
