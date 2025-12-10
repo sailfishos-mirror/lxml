@@ -121,7 +121,7 @@ jobs:
 
       - name: Build Python
         run: |
-          git clone https://github.com/python/cpython/ cpython_main
+          git clone --branch main --depth 1 https://github.com/python/cpython/ cpython_main
           cd cpython_main
           if [[ "${{inputs.freethreading}}" == "true" ]]; then
             echo "PYTHON_VERSION=3.xt-dev" >> $GITHUB_ENV
