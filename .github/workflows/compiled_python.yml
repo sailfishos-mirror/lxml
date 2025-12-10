@@ -134,13 +134,12 @@ jobs:
 
       - name: Cache [libs]
         uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        if: matrix.env.STATIC_DEPS
         with:
           path: |
             libs/*.xz
             libs/*.gz
             libs/*.zip
-          key: libs-${{ runner.os }}-${{ runner.arch }}-${{ env.LIBXML2_VERSION }}-${{ env.LIBXSLT_VERSION }}
+          key: libs-${{ runner.os }}-${{ runner.arch }}-${{ inputs.LIBXML2_VERSION }}-${{ inputs.LIBXSLT_VERSION }}
 
       - name: Run CI
         env:
