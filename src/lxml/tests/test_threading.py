@@ -137,7 +137,6 @@ class ThreadingTestCase(HelperTestCase):
 
         self._run_threads(16, run_thread)
 
-        self.assertEqual(16, len(error_logs))
         last_log = None
         for log in error_logs:
             self.assertTrue(len(log))
@@ -148,6 +147,8 @@ class ThreadingTestCase(HelperTestCase):
                 self.assertIn(':ERROR:XSLT:', str(error), str(error))
             self.assertTrue(any('UnExpectedElement' in str(error) for error in log), log)
             last_log = log
+
+        self.assertEqual(16, len(error_logs))
 
     def test_thread_xslt_apply_error_log(self):
         tree = self.parse('<tagFF/>')
