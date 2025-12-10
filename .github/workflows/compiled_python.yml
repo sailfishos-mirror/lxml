@@ -117,7 +117,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update -y -q
-          sudo apt-get install -y -q libbz2-dev lzma-dev libreadline-dev libgmp-dev
+          sudo apt-get install -y -q libbz2-dev liblzma-dev libreadline-dev libgmp-dev
 
       - name: Build Python
         run: |
