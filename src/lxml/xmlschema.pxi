@@ -82,10 +82,12 @@ cdef class XMLSchema(_Validator):
             # context for parsing, so push an implied context to route
             # resolve requests to the document's parser
             __GLOBAL_PARSER_CONTEXT.pushImpliedContextFromParser(self._doc._parser)
+
         with nogil:
-            orig_loader = _register_document_loader()
+            old_resource_loader = _register_xmlschema_resource_loader(parser_ctxt)
             self._c_schema = xmlschema.xmlSchemaParse(parser_ctxt)
-            _reset_document_loader(orig_loader)
+            _reset_resource_loader(old_resource_loader)
+
         if self._doc is not None:
             __GLOBAL_PARSER_CONTEXT.popImpliedContext()
         xmlschema.xmlSchemaFreeParserCtxt(parser_ctxt)
@@ -160,6 +162,14 @@ cdef class XMLSchema(_Validator):
         context._add_default_attributes = (self._has_default_attributes and (
             add_default_attributes or self._add_attribute_defaults))
         return context
+
+
+cdef xmlparser.xmlExternalEntityLoader _register_xmlschema_resource_loader(xmlschema.xmlSchemaParserCtxt *schema_ctxt) noexcept nogil:
+    if tree.LIBXML_VERSION < 21400:
+        return _register_resource_loader()
+    # libxml2 2.14 has per-context document loaders.
+    xmlschema.xmlSchemaSetResourceLoader(schema_ctxt, <xmlparser.xmlResourceLoader> _local_resource_loader, NULL)
+    return NULL
 
 
 @cython.final

@@ -14,8 +14,8 @@
 #include "libxml/xmlversion.h"
 #ifndef LIBXML_VERSION
 #  error the development package of libxml2 (header files etc.) is not installed correctly
-#elif LIBXML_VERSION < 20700
-#  error minimum required version of libxml2 is 2.7.0
+#elif LIBXML_VERSION < 20704
+#  error minimum required version of libxml2 is 2.7.4
 #endif
 
 #include "libxslt/xsltconfig.h"

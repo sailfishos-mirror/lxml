@@ -408,15 +408,24 @@ cdef class XSLT:
         self._xslt_resolver_context._c_style_doc = _copyDoc(c_doc, 1)
         c_doc._private = <python.PyObject*>self._xslt_resolver_context
 
-        with self._error_log:
-            orig_loader = _register_document_loader()
-            c_style = xslt.xsltParseStylesheetDoc(c_doc)
-            _reset_document_loader(orig_loader)
+        if xslt.LIBXSLT_VERSION >= 10134:
+            c_style = xslt.xsltNewStylesheet()
+            if c_style is NULL:
+                raise MemoryError()
 
-        if c_style is NULL or c_style.errors:
+        with self._error_log, lxml_document_loader, nogil:
+            if xslt.LIBXSLT_VERSION >= 10134:
+                if xslt.xsltParseStylesheetUser(c_style, c_doc) != 0 or c_style.errors:
+                    xslt.xsltFreeStylesheet(c_style)
+                    c_style = NULL
+            else:
+                c_style = xslt.xsltParseStylesheetDoc(c_doc)
+                if c_style is not NULL and c_style.errors:
+                    xslt.xsltFreeStylesheet(c_style)
+                    c_style = NULL
+
+        if c_style is NULL:
             tree.xmlFreeDoc(c_doc)
-            if c_style is not NULL:
-                xslt.xsltFreeStylesheet(c_style)
             self._xslt_resolver_context._raise_if_stored()
             # last error seems to be the most accurate here
             if self._error_log.last_error is not None and \
@@ -664,11 +673,9 @@ cdef class XSLT:
                                        <xmlerror.xmlGenericErrorFunc>_receiveXSLTError)
         if self._access_control is not None:
             self._access_control._register_in_context(transform_ctxt)
-        with self._error_log, nogil:
-            orig_loader = _register_document_loader()
+        with self._error_log, lxml_document_loader, nogil:
             c_result = xslt.xsltApplyStylesheetUser(
                 self._c_style, c_input_doc, params, NULL, NULL, transform_ctxt)
-            _reset_document_loader(orig_loader)
         return c_result
 
 

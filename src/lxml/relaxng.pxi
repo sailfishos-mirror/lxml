@@ -66,10 +66,8 @@ cdef class RelaxNG(_Validator):
                 else:
                     doc = None
                     filename = _encodeFilename(file)
-                    with self._error_log:
-                        orig_loader = _register_document_loader()
+                    with self._error_log, lxml_document_loader:
                         parser_ctxt = relaxng.xmlRelaxNGNewParserCtxt(_cstr(filename))
-                        _reset_document_loader(orig_loader)
             elif (_getFilenameForFile(file) or '')[-4:].lower() == '.rnc':
                 _require_rnc2rng()
                 rng_data_utf8 = _utf8(_rnc2rng.dumps(_rnc2rng.load(file)))
@@ -95,7 +93,9 @@ cdef class RelaxNG(_Validator):
         relaxng.xmlRelaxNGSetParserStructuredErrors(
             parser_ctxt, <xmlerror.xmlStructuredErrorFunc> _receiveError, <void*>self._error_log)
         _connectGenericErrorLog(self._error_log, xmlerror.XML_FROM_RELAXNGP)
+        old_resource_loader = _register_relaxng_resource_loader(parser_ctxt)
         self._c_schema = relaxng.xmlRelaxNGParse(parser_ctxt)
+        _reset_resource_loader(old_resource_loader)
         _connectGenericErrorLog(None)
 
         relaxng.xmlRelaxNGFreeParserCtxt(parser_ctxt)
@@ -169,3 +169,11 @@ cdef class RelaxNG(_Validator):
         _require_rnc2rng()
         rng_str = utf8(_rnc2rng.dumps(_rnc2rng.loads(src)))
         return cls(_parseMemoryDocument(rng_str, parser=None, url=base_url))
+
+
+cdef xmlparser.xmlExternalEntityLoader _register_relaxng_resource_loader(relaxng.xmlRelaxNGParserCtxt *rng_ctxt) noexcept nogil:
+    if tree.LIBXML_VERSION < 21400:
+        return _register_resource_loader()
+    # libxml2 2.14 has per-context document loaders.
+    relaxng.xmlRelaxNGSetResourceLoader(rng_ctxt, <xmlparser.xmlResourceLoader> _local_resource_loader, NULL)
+    return NULL
