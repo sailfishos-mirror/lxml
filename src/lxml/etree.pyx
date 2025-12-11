@@ -282,6 +282,22 @@ LIBXML_VERSION = __unpackIntVersion(_LIBXML_VERSION_INT)
 LIBXML_COMPILED_VERSION = __unpackIntVersion(tree.LIBXML_VERSION)
 LXML_VERSION = __unpackDottedVersion(tree.LXML_VERSION_STRING)
 
+cdef bint _get_freethreading_enabled():
+    import lxml.etree as etree
+    pymoduledef = python.PyModule_GetDef(etree)
+    if pymoduledef is NULL:
+        return False
+
+    slot = pymoduledef.m_slots
+    while slot is not NULL and slot[0].slot != 0:
+        if slot[0].slot == python.Py_mod_gil:
+            return slot[0].value == python.Py_MOD_GIL_NOT_USED
+        slot += 1
+
+    return False
+
+_freethreading_enabled = _get_freethreading_enabled()
+
 __version__ = tree.LXML_VERSION_STRING.decode("ascii")
 
 cdef extern from *:

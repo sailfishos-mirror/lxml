@@ -34,6 +34,13 @@ cdef extern from "Python.h":
       #undef PyUnicode_DATA
       #define PyUnicode_DATA(s)  (0)
     #endif
+
+    #if !defined(Py_mod_gil) && (PY_VERSION_HEX < 0x030d0000 || defined(Py_LIMITED_API) && Py_LIMITED_API < 0x030d0000)
+      #define Py_mod_gil 4
+      #define Py_MOD_GIL_USED  NULL
+      #define Py_MOD_GIL_NOT_USED  NULL
+    #endif
+
     """
 
     ctypedef struct PyObject
@@ -111,6 +118,19 @@ cdef extern from "Python.h":
     cdef void* PyMem_Malloc(size_t size)
     cdef void* PyMem_Realloc(void* p, size_t size)
     cdef void PyMem_Free(void* p)
+
+    const int Py_mod_gil
+    const void* Py_MOD_GIL_USED
+    const void* Py_MOD_GIL_NOT_USED
+
+    ctypedef struct PyModuleDef_Slot:
+        int slot
+        void* value
+
+    ctypedef struct PyModuleDef:
+        PyModuleDef_Slot* m_slots
+
+    cdef PyModuleDef* PyModule_GetDef(object module) except? NULL
 
     # always returns NULL to pass on the exception
     cdef object PyErr_SetFromErrno(object type)

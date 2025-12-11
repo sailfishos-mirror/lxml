@@ -55,6 +55,14 @@ class ThreadingTestCase(HelperTestCase):
         self.assertEqual(0, counter['failed'])
         self.assertEqual(counter['finished'], counter['started'])
 
+    @unittest.skipIf(IS_FT_PYTHON, "in freethreading Python")
+    def test_freethreading_not_enabled(self):
+        self.assertFalse(getattr(etree, '_freethreading_enabled', False))
+
+    @unittest.skipIf(not IS_FT_PYTHON, "not in freethreading Python")
+    def test_freethreading_enabled(self):
+        self.assertTrue(getattr(etree, '_freethreading_enabled', False))
+
     def test_subtree_copy_thread(self):
         tostring = self.etree.tostring
         XML = self.etree.XML

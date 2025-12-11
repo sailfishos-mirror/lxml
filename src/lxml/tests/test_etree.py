@@ -43,6 +43,7 @@ TESTED VERSION: {etree.__version__}
     Default encoding: {sys.getdefaultencoding()}
     Max Unicode:      {sys.maxunicode}
     PyUCS4 encoding:  {getattr(etree, '_pyucs4_encoding_name', '')}
+    freethreading:    {getattr(etree, '_freethreading_enabled', '')}
 """)
 
 
