@@ -199,11 +199,15 @@ def benchmark_revisions(benchmarks, revisions, profiler=None, limited_revisions=
     return timings
 
 
-def cache_libs(lxml_dir, deps_zipfile):
+def cache_libs(lxml_dir, deps_zipfile, file_suffixes=None):
+    zip_content = set(deps_zipfile.namelist())
     for dir_path, _, filenames in itertools.chain((lxml_dir / "build" / "tmp").walk(), (lxml_dir / "libs").walk()):
         for filename in filenames:
             path = dir_path / filename
-            deps_zipfile.write(path, path.relative_to(lxml_dir))
+            if file_suffixes is None or path.suffix in file_suffixes:
+                rel_path = path.relative_to(lxml_dir)
+                if str(rel_path) not in zip_content:
+                    deps_zipfile.write(path, rel_path)
 
 
 def benchmark_revision(revision, benchmarks, profiler=None, c_macros=None, deps_zipfile=None):
@@ -217,13 +221,12 @@ def benchmark_revision(revision, benchmarks, profiler=None, c_macros=None, deps_
         bm_dir.mkdir(parents=True)
         bm_files = copy_benchmarks(bm_dir, benchmarks)
 
-        deps_zip_is_empty = deps_zipfile and not deps_zipfile.namelist()
-        if deps_zipfile and not deps_zip_is_empty:
+        if deps_zipfile:
             deps_zipfile.extractall(lxml_dir)
 
         compile_lxml(lxml_dir, c_macros=c_macros)
 
-        if deps_zipfile and deps_zip_is_empty:
+        if deps_zipfile:
             cache_libs(lxml_dir, deps_zipfile)
 
         logging.info(f"### Running benchmarks for {revision}: {' '.join(bm.stem for bm in bm_files)}")
@@ -348,6 +351,7 @@ if __name__ == '__main__':
         sys.exit(1)
 
     deps_zipfile = zipfile.ZipFile(io.BytesIO(), mode='w')
+    cache_libs(BENCHMARKS_DIR.parent, deps_zipfile, file_suffixes=('.xz', '.gz', '.zip'))
 
     revisions = list({rev: rev for rev in (options.revisions + options.with_limited_api)})  # deduplicate in order
     timings = benchmark_revisions(
