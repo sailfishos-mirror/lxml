@@ -5,10 +5,12 @@ on:
     paths:
       - 'src/**'
       - '.github/workflows/benchmarks.yml'
+      - '.github/workflows/cache_libs.yml'
   pull_request:
     paths:
       - 'src/**'
       - '.github/workflows/benchmarks.yml'
+      - '.github/workflows/cache_libs.yml'
   workflow_dispatch:
 
 concurrency:
