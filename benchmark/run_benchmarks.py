@@ -21,6 +21,10 @@ ALL_BENCHMARKS = [bm.stem for bm in BENCHMARK_FILES]
 
 LIMITED_API_VERSION = max((3, 12), sys.version_info[:2])
 
+PYTHON_VERSION = "%d.%d.%d" % sys.version_info[:3]
+if hasattr(sys, '_is_gil_enabled') and not sys._is_gil_enabled():
+    PYTHON_VERSION += 't'
+
 
 try:
     from distutils import sysconfig
@@ -166,7 +170,7 @@ def run_benchmarks(bm_dir, benchmarks, pythonpath=None, profiler=None):
 
 
 def benchmark_revisions(benchmarks, revisions, profiler=None, limited_revisions=(), deps_zipfile=None):
-    python_version = "Python %d.%d.%d" % sys.version_info[:3]
+    python_version = f"Python {PYTHON_VERSION}"
     logging.info(f"### Comparing revisions in {python_version}: {' '.join(revisions)}.")
     logging.info(f"CFLAGS={os.environ.get('CFLAGS', DISTUTILS_CFLAGS)}")
 
