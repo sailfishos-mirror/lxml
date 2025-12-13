@@ -2730,17 +2730,17 @@ class ObjectifyTestCase(HelperTestCase):
         test_count = 0
         for el in root.iterchildren():
             text = el.text
-            expected_type = objectify.ObjectifiedElement
             if text:
+                expected_type = objectify.StringElement
                 try:
+                    float(text)
+                    expected_type = objectify.FloatElement
                     int(text)
                     expected_type = objectify.IntElement
                 except ValueError:
-                    try:
-                        float(text)
-                        expected_type = objectify.FloatElement
-                    except ValueError:
-                        expected_type = objectify.StringElement
+                    pass
+            else:
+                expected_type = objectify.ObjectifiedElement
 
             self.assertTrue(isinstance(el, expected_type), (text, expected_type, type(el)))
             test_count += 1
