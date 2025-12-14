@@ -42,7 +42,7 @@ parse_timings = re.compile(
 ).match
 
 
-def run(command, cwd=None, pythonpath=None, c_macros=None):
+def run(command, cwd=None, pythonpath=None, c_macros=None, capture_output=True):
     env = None
     if pythonpath:
         env = os.environ.copy()
@@ -52,7 +52,7 @@ def run(command, cwd=None, pythonpath=None, c_macros=None):
         env['CFLAGS'] = env.get('CFLAGS', '') + " " + ' '.join(f" -D{macro}" for macro in c_macros)
 
     try:
-        return subprocess.run(command, cwd=cwd, check=True, capture_output=True, env=env)
+        return subprocess.run(command, cwd=cwd, check=True, capture_output=capture_output, env=env)
     except subprocess.CalledProcessError as exc:
         logging.error(f"Command failed: {' '.join(map(str, command))}\nOutput:\n{exc.stderr.decode()}")
         raise
@@ -79,6 +79,7 @@ def compile_lxml(lxml_dir: pathlib.Path, c_macros=None):
         [sys.executable, "setup.py", "build_ext", "-i", "-j6"],
         cwd=lxml_dir,
         c_macros=c_macros,
+        #capture_output=False,
     )
 
 
