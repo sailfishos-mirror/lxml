@@ -2,7 +2,7 @@ PYTHON?=python3
 TESTFLAGS=-p -vv
 TESTOPTS=
 SETUPFLAGS=
-TSAN_FLAGS=-D__lxml_DEBUG_ATOMICS=1 -fsanitize=thread
+TSAN_FLAGS=-DLXML_DEBUG_ATOMICS=1 -fsanitize=thread
 LXMLVERSION:=$(shell $(PYTHON) -c 'import re; print(re.findall(r"__version__\s*=\s*\"([^\"]+)\"", open("src/lxml/__init__.py").read())[0])' )
 
 PYTHON_WITH_CYTHON?=$(shell $(PYTHON)  -c 'import Cython.Build.Dependencies' >/dev/null 2>/dev/null && echo " --with-cython" || true)

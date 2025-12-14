@@ -40,9 +40,9 @@ cdef extern from * nogil:
     #define __lxml_atomic_decr_relaxed(value) __lxml_atomic_add((value), -1)
     #define __lxml_atomic_load(value)         atomic_load((value))
 
-    #if defined(__lxml_DEBUG_ATOMICS) && defined(_MSC_VER)
+    #if defined(LXML_DEBUG_ATOMICS) && defined(_MSC_VER)
         #pragma message ("Using standard C11 atomics")
-    #elif defined(__lxml_DEBUG_ATOMICS)
+    #elif defined(LXML_DEBUG_ATOMICS)
         #warning "Using standard C11 atomics"
     #endif
 
@@ -55,9 +55,9 @@ cdef extern from * nogil:
     #define __lxml_atomic_decr_relaxed(value) __lxml_atomic_add((value), -1)
     #define __lxml_atomic_load(value)         _Py_atomic_load_int32((value))
 
-    #if defined(__lxml_DEBUG_ATOMICS) && defined(_MSC_VER)
+    #if defined(LXML_DEBUG_ATOMICS) && defined(_MSC_VER)
         #pragma message ("Using pyatomics.h atomics")
-    #elif defined(__lxml_DEBUG_ATOMICS)
+    #elif defined(LXML_DEBUG_ATOMICS)
         #warning "Using pyatomics.h atomics"
     #endif
 
@@ -82,7 +82,7 @@ cdef extern from * nogil:
     }
     */
 
-    #ifdef __lxml_DEBUG_ATOMICS
+    #ifdef LXML_DEBUG_ATOMICS
         #warning "Using GNU atomics"
     #endif
 
@@ -108,7 +108,7 @@ cdef extern from * nogil:
     }
     */
 
-    #ifdef __lxml_DEBUG_ATOMICS
+    #ifdef LXML_DEBUG_ATOMICS
         #pragma message ("Using MSVC atomics")
     #endif
 
@@ -151,7 +151,9 @@ cdef extern from * nogil:
     #define __lxml_atomic_compare_exchange(value, expected, desired)  __lxml_atomic_compare_exchange_cs(__pyx_v_self, (value), (expected), (desired))
     */
 
-    #ifdef __lxml_DEBUG_ATOMICS
+    #if defined(LXML_DEBUG_ATOMICS) && defined(_MSC_VER)
+        #pragma message ("Not using atomics, using CPython critical section")
+    #elif defined(LXML_DEBUG_ATOMICS)
         #warning "Not using atomics, using CPython critical section"
     #endif
 
@@ -177,7 +179,9 @@ cdef extern from * nogil:
     }
     */
 
-    #ifdef __lxml_DEBUG_ATOMICS
+    #if defined(LXML_DEBUG_ATOMICS) && defined(_MSC_VER)
+        #pragma message ("Not using atomics, using the GIL")
+    #elif defined(LXML_DEBUG_ATOMICS)
         #warning "Not using atomics, using the GIL"
     #endif
 #endif
