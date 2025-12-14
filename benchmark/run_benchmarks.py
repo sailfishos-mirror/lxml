@@ -19,7 +19,7 @@ BENCHMARK_FILES = sorted(BENCHMARKS_DIR.glob("bench_*.py"))
 
 ALL_BENCHMARKS = [bm.stem for bm in BENCHMARK_FILES]
 
-LIMITED_API_VERSION = max((3, 12), sys.version_info[:2])
+LIMITED_API_VERSION = max((3, 11), sys.version_info[:2])
 
 PYTHON_VERSION = "%d.%d.%d" % sys.version_info[:3]
 if hasattr(sys, '_is_gil_enabled') and not sys._is_gil_enabled():
@@ -234,7 +234,7 @@ def benchmark_revision(revision, benchmarks, profiler=None, c_macros=None, deps_
         return run_benchmarks(bm_dir, benchmarks, pythonpath=f"{bm_dir}:{lxml_dir / 'src'}", profiler=profiler)
 
 
-def report_revision_timings(rev_timings):
+def report_revision_timings(rev_timings, csv_out=None):
     units = {"nsec": 1e-9, "usec": 1e-6, "msec": 1e-3, "sec": 1.0}
     scales = [(scale, unit) for unit, scale in reversed(units.items())]  # biggest first
 
@@ -245,7 +245,7 @@ def report_revision_timings(rev_timings):
                 break
         else:
             raise RuntimeError(f"Timing is below nanoseconds: {t:f}")
-        return f"{t / scale :+.3f} {unit}"
+        return f"{t / scale :.3f} {unit}"
 
     timings_by_benchmark = collections.defaultdict(list)
     setup_times = []
@@ -256,8 +256,6 @@ def report_revision_timings(rev_timings):
                 timings_by_benchmark[(benchmark_module, benchmark_name, params)].append((lib, revision_name, best_time, result_text))
 
     setup_times.sort()
-    for timings in timings_by_benchmark.values():
-        timings.sort()
 
     for benchmark_module, revision_name, output in setup_times:
         result = '\n'.join(output)
@@ -276,6 +274,15 @@ def report_revision_timings(rev_timings):
             logging.info(
                 f"    {lib:3} / {revision_name[:25]:25} = {bm_time:8.4f} {result_text}{diff_str}"
             )
+            if csv_out is not None:
+                is_limited = revision_name.startswith('L-')
+                csv_out.writerow([
+                    benchmark_module, benchmark_name, params,
+                    revision_name[2:] if is_limited else revision_name,
+                    PYTHON_VERSION,
+                    'L' if is_limited else '',
+                    format_time(bm_time), diff_str,
+                ])
 
     for (lib, revision_name), diffs in differences.items():
         diffs.sort(reverse=True)
@@ -327,6 +334,11 @@ def parse_args(args):
         help="Run Valgrind's callgrind profiler on the benchmark process.",
     )
     parser.add_argument(
+        "--report",
+        dest="report_csv", default=None, metavar="FILE",
+        help="Write a CSV report of the timings to FILE."
+    )
+    parser.add_argument(
         "revisions",
         nargs="*", default=[],
         help="The git revisions to check out and benchmark.",
@@ -354,11 +366,17 @@ if __name__ == '__main__':
     deps_zipfile = zipfile.ZipFile(io.BytesIO(), mode='w')
     cache_libs(BENCHMARKS_DIR.parent, deps_zipfile, file_suffixes=('.xz', '.gz', '.zip'))
 
-    revisions = list({rev: rev for rev in (options.revisions + options.with_limited_api)})  # deduplicate in order
+    revisions = list({rev: rev for rev in (options.with_limited_api + options.revisions)})  # deduplicate in order
     timings = benchmark_revisions(
         benchmarks, revisions,
         profiler=options.profiler,
         limited_revisions=options.with_limited_api,
         deps_zipfile=deps_zipfile,
     )
-    report_revision_timings(timings)
+
+    if options.report_csv:
+        with open(options.report_csv, "w") as f:
+            import csv
+            report_revision_timings(timings, csv_out=csv.writer(f))
+    else:
+        report_revision_timings(timings)
