@@ -366,7 +366,7 @@ if __name__ == '__main__':
     deps_zipfile = zipfile.ZipFile(io.BytesIO(), mode='w')
     cache_libs(BENCHMARKS_DIR.parent, deps_zipfile, file_suffixes=('.xz', '.gz', '.zip'))
 
-    revisions = list({rev: rev for rev in (options.with_limited_api + options.revisions)})  # deduplicate in order
+    revisions = list({rev: rev for rev in (options.revisions + options.with_limited_api)})  # deduplicate in order
     timings = benchmark_revisions(
         benchmarks, revisions,
         profiler=options.profiler,
