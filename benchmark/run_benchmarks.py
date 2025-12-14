@@ -42,11 +42,14 @@ parse_timings = re.compile(
 ).match
 
 
-def run(command, cwd=None, pythonpath=None, c_macros=None, capture_output=True):
+def run(command, cwd=None, pythonpath=None, c_macros=None, extra_env=None, capture_output=True):
     env = None
     if pythonpath:
-        env = os.environ.copy()
+        env = env or os.environ.copy()
         env['PYTHONPATH'] = pythonpath
+    if extra_env:
+        env = env or os.environ.copy()
+        env.update(extra_env)
     if c_macros:
         env = env or os.environ.copy()
         env['CFLAGS'] = env.get('CFLAGS', '') + " " + ' '.join(f" -D{macro}" for macro in c_macros)
@@ -72,13 +75,14 @@ def copy_benchmarks(bm_dir: pathlib.Path, benchmarks=None):
     return bm_files
 
 
-def compile_lxml(lxml_dir: pathlib.Path, c_macros=None):
+def compile_lxml(lxml_dir: pathlib.Path, c_macros=None, env_vars=None):
     rev_hash = get_git_rev(rev_dir=lxml_dir)
     logging.info(f"Compiling lxml gitrev {rev_hash}")
     run(
         [sys.executable, "setup.py", "build_ext", "-i", "-j6"],
         cwd=lxml_dir,
         c_macros=c_macros,
+        extra_env=env_vars,
         #capture_output=False,
     )
 
@@ -186,15 +190,19 @@ def benchmark_revisions(benchmarks, revisions, profiler=None, limited_revisions=
 
         logging.info(f"### Preparing benchmark run for lxml '{revision}'.")
         timings[revision] = benchmark_revision(
-            revision, benchmarks, profiler, deps_zipfile=deps_zipfile)
+            revision, benchmarks, profiler,
+            deps_zipfile=deps_zipfile,
+        )
 
         if revision in limited_revisions:
             logging.info(
                 f"### Preparing benchmark run for lxml '{revision}' (Limited API {LIMITED_API_VERSION[0]}.{LIMITED_API_VERSION[1]}).")
             timings['L-' + revision] = benchmark_revision(
                 revision, benchmarks, profiler,
-                c_macros=["Py_LIMITED_API=0x%02x%02x0000" % LIMITED_API_VERSION],
                 deps_zipfile=deps_zipfile,
+                extra_env={
+                    'LXML_LIMITED_API': f'{LIMITED_API_VERSION[0]}.{LIMITED_API_VERSION[1]}',
+                }
             )
 
     return timings
@@ -211,7 +219,7 @@ def cache_libs(lxml_dir, deps_zipfile, file_suffixes=None):
                     deps_zipfile.write(path, rel_path)
 
 
-def benchmark_revision(revision, benchmarks, profiler=None, c_macros=None, deps_zipfile=None):
+def benchmark_revision(revision, benchmarks, profiler=None, c_macros=None, extra_env=None, deps_zipfile=None):
     with tempfile.TemporaryDirectory() as base_dir_str:
         base_dir = pathlib.Path(base_dir_str)
         lxml_dir = base_dir / "lxml" / revision
@@ -225,7 +233,7 @@ def benchmark_revision(revision, benchmarks, profiler=None, c_macros=None, deps_
         if deps_zipfile:
             deps_zipfile.extractall(lxml_dir)
 
-        compile_lxml(lxml_dir, c_macros=c_macros)
+        compile_lxml(lxml_dir, c_macros=c_macros, env_vars=extra_env)
 
         if deps_zipfile:
             cache_libs(lxml_dir, deps_zipfile)
