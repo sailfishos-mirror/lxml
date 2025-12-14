@@ -14,6 +14,7 @@ on:
   push:
     paths:
       - .github/workflows/wheels.yml
+      - .github/workflows/cache_libs.yml
       - requirements.txt
       - pyproject.toml
       - MANIFEST.in
@@ -24,6 +25,7 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - .github/workflows/wheels.yml
+      - .github/workflows/cache_libs.yml
       - requirements.txt
       - pyproject.toml
       - MANIFEST.in

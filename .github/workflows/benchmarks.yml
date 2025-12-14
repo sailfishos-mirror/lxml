@@ -4,11 +4,13 @@ on:
   push:
     paths:
       - 'src/**'
+      - 'benchmark/**'
       - '.github/workflows/benchmarks.yml'
       - '.github/workflows/cache_libs.yml'
   pull_request:
     paths:
       - 'src/**'
+      - 'benchmark/**'
       - '.github/workflows/benchmarks.yml'
       - '.github/workflows/cache_libs.yml'
   workflow_dispatch:

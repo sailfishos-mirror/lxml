@@ -5,6 +5,7 @@ on:
     paths:
       - '**'
       - '!.github/**'
+      - '!benchmark/**'
       - '.github/workflows/ci.yml'
       - '.github/workflows/cache_libs.yml'
       - '.github/workflows/compiled_python.yml'
@@ -12,6 +13,7 @@ on:
     paths:
       - '**'
       - '!.github/**'
+      - '!benchmark/**'
       - '.github/workflows/ci.yml'
       - '.github/workflows/cache_libs.yml'
       - '.github/workflows/compiled_python.yml'
