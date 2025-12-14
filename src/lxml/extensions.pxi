@@ -284,7 +284,7 @@ cdef class _BaseContext:
 
     cdef int unregisterAllFunctions(self, void* ctxt, _register_function unreg_func):
         for ns_utf, functions in self._function_cache.iteritems():
-            for name_utf in functions:
+            for name_utf in <dict> functions:
                 unreg_func(ctxt, name_utf, ns_utf)
         return 0
 
@@ -293,7 +293,7 @@ cdef class _BaseContext:
         self.has_user_extensions = self._flags.has_local_user_extensions
 
         for ns_utf, functions in self._function_cache.items():
-            for name_utf in functions:
+            for name_utf in <dict> functions:
                 if self._extensions is None or \
                        (ns_utf, name_utf) not in self._extensions:
                     unreg_func(ctxt, name_utf, ns_utf)
