@@ -100,8 +100,16 @@ jobs:
             echo; python benchmark/report.py -t timings benchmark_results_*.csv;
           } >> $GITHUB_STEP_SUMMARY
 
-      - name: Upload results
+      - name: Upload Log
         uses: actions/upload-artifact@v5
         with:
-          name: benchmark_results.txt
+          name: benchmark_log.txt
           path: benchmarks.log
+          if-no-files-found: ignore
+
+      - name: Upload timings
+        uses: actions/upload-artifact@v5
+        with:
+          name: benchmark_results_csv
+          path: benchmark_results_*.csv
+          if-no-files-found: ignore
