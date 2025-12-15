@@ -97,14 +97,14 @@ jobs:
         run: |
           MATRIX=$(
             {
-              cibuildwheel --print-build-identifiers --platform linux  # --archs "x86_64,aarch64"
-              | grep -v musllinux
-              | jq -nRc '{"only": inputs, "os": "ubuntu-latest"}'
+              cibuildwheel --print-build-identifiers --platform linux \
+              | grep -v musllinux \
+              | jq -nRc '{"only": inputs, "os": "ubuntu-latest"}' \
               | sed -e '/aarch64\|armv7l/s|ubuntu-latest|ubuntu-24.04-arm|' \
-              && cibuildwheel --print-build-identifiers --platform macos  # --archs arm64
-              | jq -nRc '{"only": inputs, "os": "macos-latest"}'
-              && cibuildwheel --print-build-identifiers --platform windows  --archs AMD64,x86
-              | jq -nRc '{"only": inputs, "os": "windows-2022"}'
+              && cibuildwheel --print-build-identifiers --platform macos \
+              | jq -nRc '{"only": inputs, "os": "macos-latest"}' \
+              && cibuildwheel --print-build-identifiers --platform windows  --archs AMD64,x86 \
+              | jq -nRc '{"only": inputs, "os": "windows-2022"}' \
               && cibuildwheel --print-build-identifiers --platform windows --archs ARM64 \
               | jq -nRc '{"only": inputs, "os": "windows-11-arm"}'
             } | jq -sc
