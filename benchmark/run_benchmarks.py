@@ -289,7 +289,7 @@ def report_revision_timings(rev_timings, csv_out=None):
                     revision_name[2:] if is_limited else revision_name,
                     PYTHON_VERSION,
                     'L' if is_limited else '',
-                    format_time(bm_time), diff_str,
+                    format_time(bm_time / 1000), diff_str,
                 ])
 
     for (lib, revision_name), diffs in differences.items():
