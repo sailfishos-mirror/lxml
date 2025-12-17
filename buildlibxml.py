@@ -112,7 +112,7 @@ def download_and_extract_windows_binaries(destdir):
 
 def find_top_dir_of_zipfile(zipfile):
     topdir = None
-    files = (f.filename for f in zipfile.filelist)
+    files = [f.filename for f in zipfile.filelist]
     dirs = [d for d in files if d.endswith('/')]
     if dirs:
         dirs.sort(key=len)
