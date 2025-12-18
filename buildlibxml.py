@@ -6,7 +6,7 @@ from contextlib import closing
 from ftplib import FTP
 
 import urllib.error
-from urllib.parse import urljoin, unquote, urlparse
+from urllib.parse import urljoin, quote as urlquote, unquote, urlparse
 from urllib.request import urlretrieve, urlopen, Request
 
 multi_make_options = []
@@ -44,25 +44,6 @@ def read_file_digest(file):
 
 
 def download_and_extract_windows_binaries(destdir):
-    url = "https://api.github.com/repos/lxml/libxml2-win-binaries/releases?per_page=5"
-    releases, _ = read_url(
-        url,
-        accept="application/vnd.github+json",
-        as_json=True,
-        github_api_token=os.environ.get("GITHUB_API_TOKEN"),
-    )
-
-    max_release = {'tag_name': ''}
-    for release in releases:
-        if max_release['tag_name'] < release.get('tag_name', ''):
-            max_release = release
-
-    url = "https://github.com/lxml/libxml2-win-binaries/releases/download/%s/" % max_release['tag_name']
-    asset_files = {
-        asset['name']: (asset['size'], asset['digest'])
-        for asset in max_release.get('assets', ())
-    }
-
     # Check for native ARM64 build or the environment variable that is set by
     # Visual Studio for cross-compilation (same variable as setuptools uses)
     if platform.machine() == 'ARM64' or os.getenv('VSCMD_ARG_TGT_ARCH') == 'arm64':
@@ -72,47 +53,86 @@ def download_and_extract_windows_binaries(destdir):
     else:
         arch = "win32"
 
-    arch_part = '.' + arch + '.'
-    asset_files = {
-        filename: details
-        for filename, details in asset_files.items()
-        if arch_part in filename
-    }
+    def build_libzip_name(libname, version):
+        return f"{libname}-{version}.{arch}.zip"
 
-    libs = {}
-    for libname in ['libxml2', 'libxslt', 'zlib', 'iconv']:
-        libs[libname] = "%s-%s.%s.zip" % (
-            libname,
-            find_max_version(libname, list(asset_files)),
-            arch,
+    def read_latest_release():
+        url = "https://api.github.com/repos/lxml/libxml2-win-binaries/releases?per_page=5"
+        releases, _ = read_url(
+            url,
+            accept="application/vnd.github+json",
+            as_json=True,
+            github_api_token=os.environ.get("GITHUB_API_TOKEN"),
         )
+
+        max_release = {'tag_name': ''}
+        for release in releases:
+            if max_release['tag_name'] < release.get('tag_name', ''):
+                max_release = release
+
+        return max_release
+
+    def find_local_lib(libname, version):
+        if not version:
+            return None
+        libfn = build_libzip_name(libname, version)
+        destfile = os.path.join(destdir, libfn)
+        return libfn if os.path.exists(destfile) else None
 
     if not os.path.exists(destdir):
         os.makedirs(destdir)
 
-    for libname, libfn in libs.items():
-        srcfile = urljoin(url, libfn)
-        destfile = os.path.join(destdir, libfn)
-        if os.path.exists(destfile):
-            file_size, file_digest = asset_files.get(libfn, (None, None))
-            if file_size and os.path.getsize(destfile) == file_size and read_file_digest(destfile) == file_digest:
-                print('Using local copy of  "{}"'.format(srcfile))
+    libs = {}
+    for libname in ['libxml2', 'libxslt', 'zlib', 'iconv']:
+        version = os.environ.get('LIBICONV_VERSION' if libname == 'iconv' else f"{libname.upper()}_VERSION")
+        libfn = find_local_lib(libname, version)
+        if libfn:
+            print(f'Using local copy of  "{libfn}"')
+        libs[libname] = libfn
+
+    if None in libs.values():
+        # Need to gather version and download URL from winlibs release.
+        latest_release = read_latest_release()
+        arch_part = f'.{arch}.'
+        asset_files = {
+            asset['name']: (asset['size'], asset['digest'])
+            for asset in latest_release.get('assets', ())
+            if arch_part in asset['name']
+        }
+        release_tag = latest_release['tag_name']
+        download_url = f"https://github.com/lxml/libxml2-win-binaries/releases/download/{urlquote(release_tag)}/"
+
+        lib_file_names = list(asset_files)
+        for libname, libfn in libs.items():
+            if libfn:
+                continue
+            version = find_max_version(libname, lib_file_names)
+            libfn = find_local_lib(libname, version)
+            if libfn:
+                libs[libname] = libfn
+                srcfile = urljoin(download_url, libfn)
+                print(f'Using local copy of  "{srcfile}"')
                 continue
 
-        print('Retrieving "%s" to "%s"' % (srcfile, destfile))
-        urlretrieve(srcfile, destfile)
+            # Need to download lib.
+            libfn = build_libzip_name(libname, version)
+            srcfile = urljoin(download_url, libfn)
+            destfile = os.path.join(destdir, libfn)
 
-    for libname, libfn in libs.items():
-        destfile = os.path.join(destdir, libfn)
-        d = unpack_zipfile(destfile, destdir)
-        libs[libname] = d
+            print(f'Retrieving "{srcfile}" to "{destfile}"')
+            urlretrieve(srcfile, destfile)
+            libs[libname] = libfn
 
-    return libs
+    lib_dirs = {
+        libname: unpack_zipfile(os.path.join(destdir, libfn), destdir)
+        for libname, libfn in libs.items()
+    }
+    return lib_dirs
 
 
 def find_top_dir_of_zipfile(zipfile):
     topdir = None
-    files = (f.filename for f in zipfile.filelist)
+    files = [f.filename for f in zipfile.filelist]
     dirs = [d for d in files if d.endswith('/')]
     if dirs:
         dirs.sort(key=len)
@@ -328,12 +348,14 @@ def find_max_version(libname, filenames, version_re=None):
         match = version_re.search(fn)
         if match:
             version_string = match.group(1)
-            versions.append((tuple(map(tryint, version_string.replace("-", ".-").split('.'))),
-                             version_string))
+            versions.append((
+                tuple(map(tryint, version_string.replace("-", ".-").split('.'))),
+                version_string,
+            ))
     if not versions:
         raise Exception(
             "Could not find the most current version of %s from the files: %s" % (
-                libname, filenames))
+                libname, list(filenames)))
     versions.sort()
     version_string = versions[-1][-1]
     print('Latest version of %s is %s' % (libname, version_string))
@@ -656,7 +678,7 @@ def main(with_zlib=True, download_only=False, platform=None):
     if platform is None:
         platform = sys_platform
 
-    if sys_platform.startswith('win'):
+    if platform.startswith('win'):
         return get_prebuilt_libxml2xslt(
             download_dir, static_include_dirs, static_library_dirs)
 
