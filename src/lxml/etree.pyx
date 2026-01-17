@@ -668,7 +668,7 @@ cdef class DocInfo:
         return root_name
 
     @cython.final
-    cdef tree.xmlDtd* _get_c_dtd(self):
+    cdef tree.xmlDtd* _get_c_dtd(self) noexcept:
         """"Return the DTD. Create it if it does not yet exist."""
         cdef xmlDoc* c_doc = self._doc._c_doc
         cdef xmlNode* c_root_node
