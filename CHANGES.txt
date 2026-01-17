@@ -32,7 +32,7 @@ Other changes
 * Built using Cython 3.2.2.
 
 
-6.0.3 (2025-??-??)
+6.0.3 (2026-??-??)
 ==================
 
 Bugs fixed
@@ -41,6 +41,10 @@ Bugs fixed
 * Slicing with large step values (outside of ``+/- sys.maxsize``) could trigger undefined C behaviour.
 
 * LP#2125399: Some failing tests were fixed or disabled in PyPy.
+
+* LP#2138421: Memory leak in error cases when setting the ``public_id`` or ``system_url`` of a document.
+
+* Memory leak in case of a memory allocation failure when copying document subtrees.
 
 
 6.0.2 (2025-09-21)
