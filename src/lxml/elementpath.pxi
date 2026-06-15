@@ -97,10 +97,10 @@ cdef object _tokenize_xpath = re.compile(
 
 cdef object _xpath_tokenizer
 
-def _xpath_tokenizer(pattern, namespaces=None, with_prefixes=True):
+def _xpath_tokenizer(pattern, namespaces=None, with_prefixes: bool = True):
     # ElementTree uses '', lxml used None originally.
     default_namespace = (namespaces.get(None) or namespaces.get('')) if namespaces else None
-    parsing_attribute = False
+    parsing_attribute: bool = False
     for token in _tokenize_xpath(pattern):
         ttype, tag = token
         if tag and tag[0] != "{":
