@@ -175,10 +175,10 @@ cdef object _DEFAULT_NAMESPACE_PREFIXES_ITEMS = []
 cdef _update_default_namespace_prefixes_items():
     cdef bytes ns, prefix
     global _DEFAULT_NAMESPACE_PREFIXES_ITEMS
-    _DEFAULT_NAMESPACE_PREFIXES_ITEMS = {
+    _DEFAULT_NAMESPACE_PREFIXES_ITEMS = list({
         ns.decode('utf-8') : prefix.decode('utf-8')
         for ns, prefix in _DEFAULT_NAMESPACE_PREFIXES.items()
-    }.items()
+    }.items())
 
 _update_default_namespace_prefixes_items()
 
@@ -198,11 +198,14 @@ def register_namespace(prefix, uri):
     if (uri_utf == b"http://www.w3.org/XML/1998/namespace" and prefix_utf != b'xml'
             or prefix_utf == b'xml' and uri_utf != b"http://www.w3.org/XML/1998/namespace"):
         raise ValueError("Cannot change the 'xml' prefix of the XML namespace")
-    for k, v in list(_DEFAULT_NAMESPACE_PREFIXES.items()):
-        if k == uri_utf or v == prefix_utf:
-            del _DEFAULT_NAMESPACE_PREFIXES[k]
-    _DEFAULT_NAMESPACE_PREFIXES[uri_utf] = prefix_utf
-    _update_default_namespace_prefixes_items()
+
+    with cython.critical_section(_DEFAULT_NAMESPACE_PREFIXES):
+        for k, v in list(_DEFAULT_NAMESPACE_PREFIXES.items()):
+            if k == uri_utf or v == prefix_utf:
+                del _DEFAULT_NAMESPACE_PREFIXES[k]
+        _DEFAULT_NAMESPACE_PREFIXES[uri_utf] = prefix_utf
+
+        _update_default_namespace_prefixes_items()
 
 
 # Error superclass for ElementTree compatibility
@@ -701,12 +704,13 @@ cdef public class _Document [ type LxmlDocumentType, object LxmlDocument ]:
 
         # none found => determine a suitable new prefix
         if c_prefix is NULL:
-            dict_result = python.PyDict_GetItem(
-                _DEFAULT_NAMESPACE_PREFIXES, <unsigned char*>c_href)
-            if dict_result is not NULL:
-                prefix = <object>dict_result
-            else:
-                prefix = self.buildNewPrefix()
+            with cython.critical_section(_DEFAULT_NAMESPACE_PREFIXES):
+                dict_result = python.PyDict_GetItem(
+                    _DEFAULT_NAMESPACE_PREFIXES, <unsigned char*>c_href)
+                if dict_result is not NULL:
+                    prefix = <object>dict_result
+                else:
+                    prefix = self.buildNewPrefix()
             c_prefix = _xcstr(prefix)
 
         # make sure the prefix is not in use already
