@@ -1014,51 +1014,42 @@ cdef _prepare_path_predicate(next):
     raise SyntaxError("invalid predicate")
 
 
-_cache = {}
-
 cdef _build_path_iterator(path, namespaces, with_prefixes=True):
     """Compile a selector pattern into a list of selectors."""
-    if path[-1:] == "/":
-        path += "*"  # implicit all (FIXME: keep this?)
+    if namespaces is not None:
+        if not namespaces:
+            namespaces = None
+        elif python.PY_VERSION_HEX >= 0x030f00a6:
+            namespaces = frozendict(namespaces)
+        else:
+            namespaces = frozenset(namespaces.items())
 
-    if namespaces:
+    return __build_path_iterator(path, namespaces, with_prefixes)
+
+
+cdef object __build_path_iterator  # need a Python function for the LRU cache, but keep it internal
+
+from functools import lru_cache
+
+@lru_cache(maxsize=100)
+def __build_path_iterator(path, namespaces, with_prefixes):
+    if namespaces is not None:
+        if python.PY_VERSION_HEX < 0x030f00a6:
+            namespaces = dict(namespaces)
         # lxml originally used None for the default namespace but ElementTree uses the
         # more convenient (all-strings-dict) empty string, so we support both here,
         # preferring the more convenient '', as long as they aren't ambiguous.
-        if None in namespaces:
-            if '' in namespaces and namespaces[None] != namespaces['']:
-                raise ValueError("Ambiguous default namespace provided: %r versus %r" % (
-                    namespaces[None], namespaces['']))
-            cache_key = (path, namespaces[None],) + tuple(sorted(
-                item for item in namespaces.items() if item[0] is not None))
-        else:
-            cache_key = (path,) + tuple(sorted(namespaces.items()))
-    else:
-        cache_key = path
+        if None in namespaces and '' in namespaces and namespaces[None] != namespaces['']:
+            raise ValueError("Ambiguous default namespace provided: %r versus %r" % (
+                namespaces[None], namespaces['']))
 
-    try:
-        return _cache[cache_key]
-    except KeyError:
-        pass
-
-    if len(_cache) > 100:
-        # Evict the oldest keys. Iteration is the only way to know the insertion order.
-        to_evict = []
-        for i, key in enumerate(_cache, 1):
-            to_evict.append(key)
-            if i == 8:
-                break
-        for key in to_evict:
-            _cache.pop(key)
-
+    if path[-1:] == "/":
+        path += "*"  # implicit all (FIXME: keep this?)
     if path[:1] == "/":
         raise SyntaxError("cannot use absolute path on element")
-    stream = iter(_xpath_tokenizer(path, namespaces, with_prefixes=with_prefixes))
-    try:
-        _next = stream.next
-    except AttributeError:
-        # Python 3
-        _next = stream.__next__
+
+    _next = iter(_xpath_tokenizer(path, namespaces, with_prefixes)).__next__
+
     try:
         token = _next()
     except StopIteration:
@@ -1099,9 +1090,10 @@ cdef _build_path_iterator(path, namespaces, with_prefixes=True):
                 token = _next()
         except StopIteration:
             break
-    _cache[cache_key] = selectors
 
     return selectors
+
+del lru_cache
 
 
 # --------------------------------------------------------------------
@@ -1278,9 +1270,13 @@ class _ElementPathModule:
     def xpath_tokenizer_re(self):
         return re.compile(xpath_tokenizer_re)
 
-    @property
-    def _cache(self):
-        return _cache
+    class _cache:
+        def clear(self):
+            __build_path_iterator.cache_clear()
+        def __len__(self):
+            return __build_path_iterator.cache_info().currsize
+
+    _cache = _cache()
 
     @staticmethod
     def iterfind(elem, path, namespaces=None, with_prefixes=True):
