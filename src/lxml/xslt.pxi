@@ -548,7 +548,10 @@ cdef class XSLT:
         transform_ctxt = xslt.xsltNewTransformContext(self._c_style, c_doc)
         if transform_ctxt is NULL:
             _destroyFakeDoc(input_doc._c_doc, c_doc)
-            input_doc.unlock_fakedoc()
+            if use_write_lock:
+                input_doc.unlock_write()
+            else:
+                input_doc.unlock_fakedoc()
             raise MemoryError()
 
         # using the stylesheet dict is safer than using a possibly

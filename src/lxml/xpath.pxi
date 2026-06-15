@@ -346,19 +346,21 @@ cdef class XPathDocumentEvaluator(XPathElementEvaluator):
             else:
                 doc.lock_fakedoc()
 
-            c_doc = _fakeRootDoc(doc._c_doc, self._element._c_node)
             try:
-                self._context.registerVariables(_variables)
-                c_path = _xcstr(path)
-                with nogil:
-                    self._xpathCtxt.doc  = c_doc
-                    self._xpathCtxt.node = tree.xmlDocGetRootElement(c_doc)
-                    xpathObj = xpath.xmlXPathEvalExpression(
-                        c_path, self._xpathCtxt)
-                result = self._handle_result(xpathObj, doc)
-            finally:
-                _destroyFakeDoc(doc._c_doc, c_doc)
+                c_doc = _fakeRootDoc(doc._c_doc, self._element._c_node)
+                try:
+                    self._context.registerVariables(_variables)
+                    c_path = _xcstr(path)
+                    with nogil:
+                        self._xpathCtxt.doc  = c_doc
+                        self._xpathCtxt.node = tree.xmlDocGetRootElement(c_doc)
+                        xpathObj = xpath.xmlXPathEvalExpression(
+                            c_path, self._xpathCtxt)
+                    result = self._handle_result(xpathObj, doc)
+                finally:
+                    _destroyFakeDoc(doc._c_doc, c_doc)
 
+            finally:
                 if use_write_lock:
                     doc.unlock_write()
                 else:
