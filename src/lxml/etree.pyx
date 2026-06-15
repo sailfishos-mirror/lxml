@@ -612,23 +612,24 @@ cdef public class _Document [ type LxmlDocumentType, object LxmlDocument ]:
         cdef xmlNode* c_root_node
         public_id = None
         sys_url   = None
-        c_dtd = self._c_doc.intSubset
-        if c_dtd is not NULL:
-            if c_dtd.ExternalID is not NULL:
-                public_id = funicode(c_dtd.ExternalID)
-            if c_dtd.SystemID is not NULL:
-                sys_url = funicode(c_dtd.SystemID)
-        c_dtd = self._c_doc.extSubset
-        if c_dtd is not NULL:
-            if not public_id and c_dtd.ExternalID is not NULL:
-                public_id = funicode(c_dtd.ExternalID)
-            if not sys_url and c_dtd.SystemID is not NULL:
-                sys_url = funicode(c_dtd.SystemID)
-        c_root_node = tree.xmlDocGetRootElement(self._c_doc)
-        if c_root_node is NULL:
-            root_name = None
-        else:
-            root_name = funicode(c_root_node.name)
+        with cython.critical_section(self._lock):
+            c_dtd = self._c_doc.intSubset
+            if c_dtd is not NULL:
+                if c_dtd.ExternalID is not NULL:
+                    public_id = funicode(c_dtd.ExternalID)
+                if c_dtd.SystemID is not NULL:
+                    sys_url = funicode(c_dtd.SystemID)
+            c_dtd = self._c_doc.extSubset
+            if c_dtd is not NULL:
+                if not public_id and c_dtd.ExternalID is not NULL:
+                    public_id = funicode(c_dtd.ExternalID)
+                if not sys_url and c_dtd.SystemID is not NULL:
+                    sys_url = funicode(c_dtd.SystemID)
+            c_root_node = tree.xmlDocGetRootElement(self._c_doc)
+            if c_root_node is NULL:
+                root_name = None
+            else:
+                root_name = funicode(c_root_node.name)
         return root_name, public_id, sys_url
 
     @cython.final
@@ -824,9 +825,10 @@ cdef class DocInfo:
                 if not c_dtd:
                     tree.xmlFree(c_value)
                     raise MemoryError()
-                if c_dtd.ExternalID:
-                    tree.xmlFree(<void*>c_dtd.ExternalID)
+                old_id = c_dtd.ExternalID
                 c_dtd.ExternalID = c_value
+                if old_id:
+                    tree.xmlFree(<void*> old_id)
 
     property system_url:
         """System ID of the DOCTYPE.
@@ -856,9 +858,10 @@ cdef class DocInfo:
                 if not c_dtd:
                     tree.xmlFree(c_value)
                     raise MemoryError()
-                if c_dtd.SystemID:
-                    tree.xmlFree(<void*>c_dtd.SystemID)
+                old_id = c_dtd.SystemID
                 c_dtd.SystemID = c_value
+                if old_id:
+                    tree.xmlFree(<void*> old_id)
 
     @property
     def xml_version(self):
