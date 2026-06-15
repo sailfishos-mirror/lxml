@@ -202,7 +202,7 @@ cdef class _BaseContext:
             raise TypeError, "empty prefix is not supported in XPath"
         prefix_utf = self._to_utf(prefix)
         ns_uri_utf = self._to_utf(ns_uri)
-        self._global_namespaces.append(prefix_utf)
+        self._global_namespaces.append((prefix_utf, ns_uri_utf))
         xpath.xmlXPathRegisterNs(self._xpathCtxt,
                                  _xcstr(prefix_utf), _xcstr(ns_uri_utf))
 
@@ -216,14 +216,16 @@ cdef class _BaseContext:
     cdef registerGlobalNamespaces(self):
         ns_prefixes: list = _find_all_extension_prefixes()
         if ns_prefixes:
-            for prefix_utf, ns_uri_utf in ns_prefixes:
-                self._global_namespaces.append(prefix_utf)
+            for prefix_and_uri in ns_prefixes:
+                # Keep references to both since the registry might change while we use it.
+                self._global_namespaces.append(prefix_and_uri)
+                prefix_utf, ns_uri_utf = prefix_and_uri
                 xpath.xmlXPathRegisterNs(
                     self._xpathCtxt, _xcstr(prefix_utf), _xcstr(ns_uri_utf))
 
     cdef unregisterGlobalNamespaces(self):
         if self._global_namespaces:
-            for prefix_utf in self._global_namespaces:
+            for prefix_utf, _ in self._global_namespaces:
                 xpath.xmlXPathRegisterNs(self._xpathCtxt,
                                          _xcstr(prefix_utf), NULL)
             del self._global_namespaces[:]
@@ -244,18 +246,19 @@ cdef class _BaseContext:
         cdef python.PyObject* dict_result
         cdef dict d
         cdef bint has_external_function = False
-        for ns_utf, ns_functions in __FUNCTION_NAMESPACE_REGISTRIES.iteritems():
-            dict_result = python.PyDict_GetItem(
-                self._function_cache, ns_utf)
-            if dict_result is not NULL:
-                d = <dict>dict_result
-            else:
-                d = {}
-                self._function_cache[ns_utf] = d
-            for name_utf, function in ns_functions.iteritems():
-                d[name_utf] = function
-                reg_func(ctxt, name_utf, ns_utf)
-                has_external_function = True
+        with cython.critical_section(__FUNCTION_NAMESPACE_REGISTRIES):
+            for ns_utf, ns_functions in __FUNCTION_NAMESPACE_REGISTRIES.iteritems():
+                dict_result = python.PyDict_GetItem(
+                    self._function_cache, ns_utf)
+                if dict_result is not NULL:
+                    d = <dict>dict_result
+                else:
+                    d = {}
+                    self._function_cache[ns_utf] = d
+                for name_utf, function in ns_functions.iteritems():
+                    d[name_utf] = function
+                    reg_func(ctxt, name_utf, ns_utf)
+                    has_external_function = True
         if has_external_function:
             self._flags.has_global_user_extensions = True
             self.has_user_extensions = True

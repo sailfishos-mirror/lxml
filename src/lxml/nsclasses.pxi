@@ -271,9 +271,10 @@ cdef class _XPathFunctionNamespaceRegistry(_FunctionNamespaceRegistry):
 cdef list _find_all_extension_prefixes():
     "Internal lookup function to find all function prefixes for XSLT/XPath."
     cdef _XPathFunctionNamespaceRegistry registry
-    ns_prefixes = [
-        (registry._prefix_utf, registry._ns_uri_utf)
-        for registry in __FUNCTION_NAMESPACE_REGISTRIES.itervalues()
-        if registry._prefix_utf is not None and registry._ns_uri_utf is not None
-    ]
+    with cython.critical_section(__FUNCTION_NAMESPACE_REGISTRIES):
+        ns_prefixes = [
+            (registry._prefix_utf, registry._ns_uri_utf)
+            for registry in __FUNCTION_NAMESPACE_REGISTRIES.values()
+            if registry._prefix_utf is not None and registry._ns_uri_utf is not None
+        ]
     return ns_prefixes
