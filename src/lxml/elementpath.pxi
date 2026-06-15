@@ -705,6 +705,8 @@ cdef class _NegIndexPathEvaluator(_PathEvaluator):
     cdef xmlNode** node_window
 
     def __cinit__(self, Py_ssize_t c_index):
+        if c_index >= 0:
+            raise ValueError(f"negative index must be < 0, got {c_index}")
         c_index = -c_index
         self.index = c_index  # 1-based for modulus
         self.node_window = <xmlNode**> python.lxml_malloc(c_index, sizeof(xmlNode*))
