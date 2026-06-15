@@ -250,11 +250,15 @@ cdef public class FallbackElementClassLookup(ElementClassLookup) \
     cdef void _setFallback(self, ElementClassLookup lookup):
         """Sets the fallback scheme for this lookup method.
         """
+        lookup_function = lookup._lookup_function
+        if lookup_function is NULL:
+            lookup = None
+            lookup_function = _lookupDefaultElementClassesOnly
+        # Temporarily disable the lookup state usage to prevent inconsistent concurrent lookups.
+        self._fallback_function = _lookupDefaultElementClassesOnly
+
         self.fallback = lookup
-        self._fallback_function = lookup._lookup_function
-        if self._fallback_function is NULL:
-            self.fallback = None
-            self._fallback_function = _lookupDefaultElementClassesOnly
+        self._fallback_function = lookup_function
 
     def set_fallback(self, ElementClassLookup lookup not None):
         """set_fallback(self, lookup)
