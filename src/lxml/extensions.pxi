@@ -314,7 +314,7 @@ cdef class _BaseContext:
             self._function_cache, None if c_ns_uri is NULL else c_ns_uri)
         if c_dict is not NULL:
             dict_result = python.PyDict_GetItem(
-                <object>c_dict, <unsigned char*>c_name)
+                <object>c_dict, <const unsigned char*>c_name)
             if dict_result is not NULL:
                 return <object>dict_result
         return None
