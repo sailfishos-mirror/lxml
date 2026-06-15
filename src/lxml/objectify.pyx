@@ -1203,48 +1203,56 @@ cdef class PyType:
         """
         if self.name == TREE_PYTYPE_NAME:
             raise ValueError, "Cannot register tree type"
-        if self.type_check is not None:
-            for item in _TYPE_CHECKS:
-                if item[0] is self.type_check:
-                    _TYPE_CHECKS.remove(item)
-                    break
-            entry = (self.type_check, self)
-            first_pos = 0
-            last_pos = -1
-            if before or after:
-                if before is None:
-                    before = ()
-                elif after is None:
-                    after = ()
-                for i, (check, pytype) in enumerate(_TYPE_CHECKS):
-                    if last_pos == -1 and pytype.name in before:
-                        last_pos = i
-                    if pytype.name in after:
-                        first_pos = i+1
-            if last_pos == -1:
-                _TYPE_CHECKS.append(entry)
-            elif first_pos > last_pos:
-                raise ValueError, "inconsistent before/after dependencies"
-            else:
-                _TYPE_CHECKS.insert(last_pos, entry)
 
-        _PYTYPE_DICT[self.name] = self
-        for xs_type in self._schema_types:
-            _SCHEMA_TYPE_DICT[xs_type] = self
+        cdef PyType pytype
+        if self.type_check is not None:
+            entry = (self.type_check, self)
+            with cython.critical_section(_TYPE_CHECKS):
+                for item in _TYPE_CHECKS:
+                    if item[0] is self.type_check:
+                        _TYPE_CHECKS.remove(item)
+                        break
+                first_pos = 0
+                last_pos = -1
+                if before or after:
+                    if before is None:
+                        before = ()
+                    elif after is None:
+                        after = ()
+                    for i, (check, pytype) in enumerate(_TYPE_CHECKS):
+                        if last_pos == -1 and pytype.name in before:
+                            last_pos = i
+                        if pytype.name in after:
+                            first_pos = i+1
+                if last_pos == -1:
+                    _TYPE_CHECKS.append(entry)
+                elif first_pos > last_pos:
+                    raise ValueError, "inconsistent before/after dependencies"
+                else:
+                    _TYPE_CHECKS.insert(last_pos, entry)
+
+        with cython.critical_section(_PYTYPE_DICT):
+            _PYTYPE_DICT[self.name] = self
+
+        with cython.critical_section(_SCHEMA_TYPE_DICT):
+            for xs_type in self._schema_types:
+                _SCHEMA_TYPE_DICT[xs_type] = self
 
     def unregister(self):
         "unregister(self)"
-        if _PYTYPE_DICT.get(self.name) is self:
-            del _PYTYPE_DICT[self.name]
-        for xs_type, pytype in list(_SCHEMA_TYPE_DICT.items()):
-            if pytype is self:
-                del _SCHEMA_TYPE_DICT[xs_type]
-        if self.type_check is None:
-            return
-        try:
-            _TYPE_CHECKS.remove( (self.type_check, self) )
-        except ValueError:
-            pass
+        with cython.critical_section(_PYTYPE_DICT):
+            if _PYTYPE_DICT.get(self.name) is self:
+                del _PYTYPE_DICT[self.name]
+        with cython.critical_section(_SCHEMA_TYPE_DICT):
+            for xs_type, pytype in list(_SCHEMA_TYPE_DICT.items()):
+                if pytype is self:
+                    del _SCHEMA_TYPE_DICT[xs_type]
+        if self.type_check is not None:
+            try:
+                with cython.critical_section(_TYPE_CHECKS):
+                    _TYPE_CHECKS.remove( (self.type_check, self) )
+            except ValueError:
+                pass
 
     property xmlSchemaTypes:
         """The list of XML Schema datatypes this Python type maps to.
