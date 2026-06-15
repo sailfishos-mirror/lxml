@@ -2068,14 +2068,14 @@ def set_default_parser(new_parser = None):
 
     Call without arguments to reset to the original parser.
     """
+    if new_parser is None:
+        new_parser = __DEFAULT_PARSER
+    elif not isinstance(new_parser, etree.XMLParser):
+        raise TypeError, "parser must inherit from lxml.etree.XMLParser"
+
     global objectify_parser
     with cython.critical_section(__DEFAULT_PARSER):
-        if new_parser is None:
-            objectify_parser = __DEFAULT_PARSER
-        elif isinstance(new_parser, etree.XMLParser):
-            objectify_parser = new_parser
-        else:
-            raise TypeError, "parser must inherit from lxml.etree.XMLParser"
+        objectify_parser = new_parser
 
 
 cdef _get_default_parser():
