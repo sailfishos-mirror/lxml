@@ -736,7 +736,13 @@ cdef class _ParserContext(_ResolverContext):
         self._c_ctxt.sax.serror = <xmlerror.xmlStructuredErrorFunc> _receiveParserError
         self._orig_loader = _register_resource_loader() if set_document_loader else NULL
         if self._validator is not None:
-            self._validator.connect(self._c_ctxt, self._error_log)
+            try:
+                self._validator.connect(self._c_ctxt, self._error_log)
+            except:
+                if config.ENABLE_THREADING:
+                    self._lock_owner_tid = 0
+                    self._lock.release()
+                raise
         return 0
 
     cdef int cleanup(self) except -1:
