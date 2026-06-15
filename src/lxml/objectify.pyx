@@ -74,24 +74,30 @@ def set_pytype_attribute_tag(attribute_tag=None):
 
     Default: "{http://codespeak.net/lxml/objectify/pytype}pytype"
     """
+    if attribute_tag is None:
+        namespace, namespace_utf = _unicodeAndUtf8("http://codespeak.net/lxml/objectify/pytype")
+        attribute_name, attribute_name_utf = _unicodeAndUtf8("pytype")
+    else:
+        namespace_utf, attribute_name_utf = cetree.getNsTag(attribute_tag)
+        namespace = namespace_utf.decode('utf8')
+        attribute_name = attribute_name_utf.decode('utf8')
+
+    cdef const_xmlChar *c_namespace = namespace_utf
+    cdef const_xmlChar *c_attribute = attribute_name_utf
+
     global PYTYPE_ATTRIBUTE, _PYTYPE_NAMESPACE, _PYTYPE_ATTRIBUTE_NAME
     global PYTYPE_NAMESPACE, PYTYPE_NAMESPACE_UTF8
     global PYTYPE_ATTRIBUTE_NAME, PYTYPE_ATTRIBUTE_NAME_UTF8
-    if attribute_tag is None:
-        PYTYPE_NAMESPACE, PYTYPE_NAMESPACE_UTF8 = \
-            _unicodeAndUtf8("http://codespeak.net/lxml/objectify/pytype")
-        PYTYPE_ATTRIBUTE_NAME, PYTYPE_ATTRIBUTE_NAME_UTF8 = \
-            _unicodeAndUtf8("pytype")
-    else:
-        PYTYPE_NAMESPACE_UTF8, PYTYPE_ATTRIBUTE_NAME_UTF8 = \
-            cetree.getNsTag(attribute_tag)
-        PYTYPE_NAMESPACE = PYTYPE_NAMESPACE_UTF8.decode('utf8')
-        PYTYPE_ATTRIBUTE_NAME = PYTYPE_ATTRIBUTE_NAME_UTF8.decode('utf8')
 
-    _PYTYPE_NAMESPACE      = PYTYPE_NAMESPACE_UTF8
-    _PYTYPE_ATTRIBUTE_NAME = PYTYPE_ATTRIBUTE_NAME_UTF8
-    PYTYPE_ATTRIBUTE = cetree.namespacedNameFromNsName(
-        _PYTYPE_NAMESPACE, _PYTYPE_ATTRIBUTE_NAME)
+    with cython.critical_section(TREE_PYTYPE_NAME):  # anything global and immutable, really
+        # First overwrite the C string pointers, then replace their old Python bytes targets.
+        _PYTYPE_NAMESPACE      = c_namespace
+        _PYTYPE_ATTRIBUTE_NAME = c_attribute
+
+        PYTYPE_NAMESPACE, PYTYPE_NAMESPACE_UTF8 = namespace, namespace_utf
+        PYTYPE_ATTRIBUTE_NAME, PYTYPE_ATTRIBUTE_NAME_UTF8 = attribute_name, attribute_name_utf
+
+        PYTYPE_ATTRIBUTE = cetree.namespacedNameFromNsName(c_namespace, c_attribute)
 
 set_pytype_attribute_tag()
 
