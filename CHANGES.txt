@@ -14,6 +14,21 @@ Features added
 * Python Element proxy instantiation was tuned another bit to shave off more of the
   performance disadvantages added by tree locking.
 
+* The path compilation cache used by ElementPath uses an LRU eviction scheme.
+  It previously just cleared the whole cache when overflowing.
+
+Bugs fixed
+----------
+
+* Attribute iteration now remembers a safe integer index instead of a tree attribute pointer
+  that is potentially subject of user side modifications.  This may make attribute iteration
+  slightly slower for long sequences of attributes but allows for attribute manipulation
+  between iteration steps, giving similar iteration+manipulation semantics as Python lists.
+
+* Several issues (race conditions, memory leaks on error handling, crashes)
+  were found via an automated review and subsequently resolved.
+  Review contributed by devdanzin.
+
 
 7.0.0a2 (2026-06-09)
 ====================
