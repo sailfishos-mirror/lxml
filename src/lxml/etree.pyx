@@ -3334,31 +3334,40 @@ MutableMapping.register(_Attrib)
 
 @cython.final
 @cython.internal
+@cython.freelist(8)
 cdef class _AttribIterator:
     """Attribute iterator - for internal use only!
     """
-    # XML attributes must not be removed while running!
+    # To prevent dangling pointers on attribute removal,
+    # we only store the current element and an attribute index.
     cdef _Element _node
-    cdef xmlAttr* _c_attr
+    cdef Py_ssize_t _index
     cdef int _keysvalues # 1 - keys, 2 - values, 3 - items (key, value)
+
     def __iter__(self):
         return self
 
     def __next__(self):
         cdef xmlAttr* c_attr
+        cdef Py_ssize_t index
         if self._node is None:
             raise StopIteration
         doc = self._node._doc
         doc.lock_read()
         try:
-            c_attr = self._c_attr
-            while c_attr is not NULL and c_attr.type != tree.XML_ATTRIBUTE_NODE:
+            c_attr = self._node._c_node.properties
+            index = self._index
+            while c_attr is not NULL:
+                index -= c_attr.type == tree.XML_ATTRIBUTE_NODE
+                if index < 0:
+                    break
                 c_attr = c_attr.next
+
             if c_attr is NULL:
                 self._node = None
                 raise StopIteration
 
-            self._c_attr = c_attr.next
+            self._index += 1
             if self._keysvalues == 1:
                 return _namespacedName(<xmlNode*>c_attr)
             elif self._keysvalues == 2:
@@ -3373,10 +3382,8 @@ cdef object _attributeIteratorFactory(_Element element, int keysvalues):
     cdef _AttribIterator attribs
     if element._c_node.properties is NULL:
         return ITER_EMPTY
-    attribs = _AttribIterator()
+    attribs = _AttribIterator.__new__(_AttribIterator)
     attribs._node = element
-    # FIXME: Keeping this pointer around is inherently not thread-safe:
-    attribs._c_attr = element._c_node.properties
     attribs._keysvalues = keysvalues
     return attribs
 
