@@ -124,6 +124,8 @@ cdef class _XPathEvaluatorBase:
 
     def __init__(self, namespaces, extensions, enable_regexp,
                  smart_strings):
+        if self._context is not None:
+            raise RuntimeError("Repeated call to _XPathEvaluatorBase.__init__()")
         self._context = _XPathContext(namespaces, extensions, self._error_log,
                                       enable_regexp, None, smart_strings)
 
@@ -222,6 +224,9 @@ cdef class XPathElementEvaluator(_XPathEvaluatorBase):
 
     def __init__(self, _Element element not None, *, namespaces=None,
                  extensions=None, regexp=True, smart_strings=True):
+        if self._xpathCtxt is not NULL:
+            raise RuntimeError("Repeated call to XPathElementEvaluator.__init__()")
+
         cdef xpath.xmlXPathContext* xpathCtxt
         cdef int ns_register_status
         cdef _Document doc
@@ -415,6 +420,9 @@ cdef class XPath(_XPathEvaluatorBase):
 
     def __init__(self, path, *, namespaces=None, extensions=None,
                  regexp=True, smart_strings=True):
+        if self._xpath is not NULL:
+            return
+
         cdef xpath.xmlXPathContext* xpathCtxt
         _XPathEvaluatorBase.__init__(self, namespaces, extensions,
                                      regexp, smart_strings)

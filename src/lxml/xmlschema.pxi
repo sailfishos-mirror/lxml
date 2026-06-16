@@ -43,6 +43,9 @@ cdef class XMLSchema(_Validator):
         self._add_attribute_defaults = False
 
     def __init__(self, etree=None, *, file=None, bint attribute_defaults=False):
+        if self._c_schema is not NULL:
+            raise RuntimeError("Repeated call to XMLSchema.__init__()")
+
         cdef xmlschema.xmlSchemaParserCtxt* parser_ctxt
         cdef xmlDoc* c_doc
 

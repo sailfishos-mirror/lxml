@@ -373,11 +373,11 @@ cdef class XSLT:
     cdef XSLTAccessControl _access_control
     cdef _ErrorLog _error_log
 
-    def __cinit__(self):
-        self._c_style = NULL
-
     def __init__(self, xslt_input, *, extensions=None, regexp=True,
                  access_control=None):
+        if self._c_style is not NULL:
+            raise RuntimeError("Repeated call to XSLT.__init__()")
+
         cdef xslt.xsltStylesheet* c_style = NULL
         cdef xmlDoc* c_doc
         cdef _Document doc

@@ -23,6 +23,9 @@ cdef class ObjectPath:
     cdef Py_ssize_t _path_len
 
     def __init__(self, path):
+        if self._c_path is not NULL:
+            raise RuntimeError("Repeated call to ObjectPath.__init__()")
+
         if python._isString(path):
             self._path = _parse_object_path_string(path)
             self._path_str = path

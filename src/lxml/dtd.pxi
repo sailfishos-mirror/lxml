@@ -277,7 +277,11 @@ cdef class DTD(_Validator):
     catalog.
     """
     cdef tree.xmlDtd* _c_dtd
+
     def __init__(self, file=None, *, external_id=None):
+        if self._c_dtd is not NULL:
+            raise RuntimeError("Repeated call to DTD.__init__()")
+
         _Validator.__init__(self)
         if file is not None:
             file = _getFSPathOrObject(file)

@@ -71,6 +71,9 @@ cdef class Schematron(_Validator):
     cdef xmlDoc* _c_schema_doc
 
     def __init__(self, etree=None, *, file=None):
+        if self._c_schema is not NULL:
+            raise RuntimeError("Repeated call to Schematron.__init__()")
+
         cdef _Document doc
         cdef _Element root_node
         cdef xmlNode* c_node

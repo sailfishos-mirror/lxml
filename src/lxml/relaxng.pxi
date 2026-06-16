@@ -41,6 +41,9 @@ cdef class RelaxNG(_Validator):
     cdef relaxng.xmlRelaxNG* _c_schema
 
     def __init__(self, etree=None, *, file=None):
+        if self._c_schema is not NULL:
+            raise RuntimeError("Repeated call to RelaxNG.__init__()")
+
         cdef _Document doc
         cdef _Element root_node
         cdef xmlDoc* fake_c_doc = NULL
