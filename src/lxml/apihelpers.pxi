@@ -126,15 +126,22 @@ cdef _Element _makeElement(tag, xmlDoc* c_doc, _Document doc, _BaseParser parser
     if is_new_doc:
         tree.xmlDocSetRootElement(c_doc, c_node)
 
-    # add namespaces to node if necessary
-    _setNodeNamespaces(c_node, doc, ns_utf, nsmap)
+    try:
+        # add namespaces to node if necessary
+        _setNodeNamespaces(c_node, doc, ns_utf, nsmap)
 
-    if text is not None:
-        _setNodeText(c_node, text)
-    if tail is not None:
-        _setTailText(c_node, tail)
+        if text is not None:
+            _setNodeText(c_node, text)
+        if tail is not None:
+            _setTailText(c_node, tail)
 
-    _initNodeAttributes(c_node, doc, attrib, extra_attrs)
+        _initNodeAttributes(c_node, doc, attrib, extra_attrs)
+    except:
+        if not is_new_doc:
+            # Not in the document yet, need to free it explicitly.
+            tree.xmlFreeNodeList(c_node)
+            c_node = NULL
+        raise
 
     return _elementFactory(doc, c_node)
 
