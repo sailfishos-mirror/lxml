@@ -76,21 +76,25 @@ cdef class XMLSchema(_Validator):
         # Need a cast here because older libxml2 releases do not use 'const' in the functype.
         xmlschema.xmlSchemaSetParserStructuredErrors(
             parser_ctxt, <xmlerror.xmlStructuredErrorFunc> _receiveError, <void*>self._error_log)
-        if self._doc is not None:
-            # calling xmlSchemaParse on a schema with imports or
-            # includes will cause libxml2 to create an internal
-            # context for parsing, so push an implied context to route
-            # resolve requests to the document's parser
-            __GLOBAL_PARSER_CONTEXT.pushImpliedContextFromParser(self._doc._parser)
 
-        with nogil:
-            old_resource_loader = _register_xmlschema_resource_loader(parser_ctxt)
-            self._c_schema = xmlschema.xmlSchemaParse(parser_ctxt)
-            _reset_resource_loader(old_resource_loader)
+        try:
+            if self._doc is not None:
+                # calling xmlSchemaParse on a schema with imports or
+                # includes will cause libxml2 to create an internal
+                # context for parsing, so push an implied context to route
+                # resolve requests to the document's parser
+                __GLOBAL_PARSER_CONTEXT.pushImpliedContextFromParser(self._doc._parser)
 
-        if self._doc is not None:
-            __GLOBAL_PARSER_CONTEXT.popImpliedContext()
-        xmlschema.xmlSchemaFreeParserCtxt(parser_ctxt)
+            with nogil:
+                old_resource_loader = _register_xmlschema_resource_loader(parser_ctxt)
+                self._c_schema = xmlschema.xmlSchemaParse(parser_ctxt)
+                _reset_resource_loader(old_resource_loader)
+
+            if self._doc is not None:
+                __GLOBAL_PARSER_CONTEXT.popImpliedContext()
+
+        finally:
+            xmlschema.xmlSchemaFreeParserCtxt(parser_ctxt)
 
         if self._c_schema is NULL:
             raise XMLSchemaParseError(
